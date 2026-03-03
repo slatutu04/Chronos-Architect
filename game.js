@@ -181,10 +181,10 @@ class Enemy {
 
     getFireRate() {
         switch (this.type) {
-            case 'sentinel': return 15;
-            case 'sniper': return 120;
-            case 'drone': return 80;
-            default: return 60;
+            case 'sentinel': return 10;   // Faster rapid fire
+            case 'sniper': return 70;     // Balanced sniper shots
+            case 'drone': return 40;      // Faster patrol drones
+            default: return 30;           // Faster fixed turrets
         }
     }
 
