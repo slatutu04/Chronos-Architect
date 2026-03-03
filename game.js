@@ -303,8 +303,10 @@ class ChronosEngine {
 
         window.addEventListener('keydown', e => {
             this.inputKeys[e.key] = true;
-            if (e.key === 'r' || e.key === 'R') this.toggleTimestop();
-            if (e.key === 'Escape') this.togglePause();
+            if (this.running && !this.isPaused) {
+                if (e.key === 'r' || e.key === 'R') this.toggleTimestop();
+            }
+            if (e.key === 'Escape') this.handleEscape();
         });
         window.addEventListener('keyup', e => this.inputKeys[e.key] = false);
         window.addEventListener('resize', () => this.resize());
@@ -586,22 +588,45 @@ class ChronosEngine {
 
     showControls() {
         this.returningScreen = 'start-screen';
-        document.getElementById('start-screen').classList.add('hidden');
-        document.getElementById('pause-screen').classList.add('hidden');
+        this.hideAllOverlays();
+        document.getElementById('controls-screen').classList.remove('hidden');
+    }
+
+    showControlsFromPause() {
+        this.returningScreen = 'pause-screen';
+        this.hideAllOverlays();
         document.getElementById('controls-screen').classList.remove('hidden');
     }
 
     showMenu() {
-        document.getElementById('controls-screen').classList.add('hidden');
+        this.hideAllOverlays();
         document.getElementById(this.returningScreen).classList.remove('hidden');
+    }
+
+    hideAllOverlays() {
+        const screens = ['start-screen', 'pause-screen', 'controls-screen', 'death-screen', 'clear-screen', 'unlock-screen', 'quit-screen'];
+        screens.forEach(s => {
+            const el = document.getElementById(s);
+            if (el) el.classList.add('hidden');
+        });
+    }
+
+    handleEscape() {
+        // If in controls, go back
+        if (!document.getElementById('controls-screen').classList.contains('hidden')) {
+            this.showMenu();
+            return;
+        }
+        // If playing, toggle pause
+        if (this.running) {
+            this.togglePause();
+        }
     }
 
     quit() {
         this.running = false;
-        document.getElementById('start-screen').classList.add('hidden');
+        this.hideAllOverlays();
         document.getElementById('quit-screen').classList.remove('hidden');
-        // window.close() usually fails in modern browsers unless opened by script, 
-        // so we show a dedicated "Connection Terminated" screen.
     }
 
     gameOver() {
@@ -610,10 +635,13 @@ class ChronosEngine {
     }
 
     restartLevel() {
-        document.getElementById('death-screen').classList.add('hidden');
+        this.hideAllOverlays();
         this.initLevel(this.level);
         this.running = true;
-        this.loop();
+        if (!this.loopInitiated) {
+            this.loopInitiated = true;
+            this.loop();
+        }
     }
 
     nextLevel() {
@@ -628,10 +656,13 @@ class ChronosEngine {
             this.level = 1;
             this.timestopUnlocked = false;
         }
-        document.getElementById('clear-screen').classList.add('hidden');
+        this.hideAllOverlays();
         this.initLevel(this.level);
         this.running = true;
-        this.loop();
+        if (!this.loopInitiated) {
+            this.loopInitiated = true;
+            this.loop();
+        }
     }
 
     showUnlockCutscene() {
@@ -650,20 +681,21 @@ class ChronosEngine {
     }
 
     togglePause() {
-        if (!this.running && !this.isPaused) return; // Only pause during active play
+        if (!this.running) return;
 
         this.isPaused = !this.isPaused;
         if (this.isPaused) {
+            this.hideAllOverlays();
             document.getElementById('pause-screen').classList.remove('hidden');
         } else {
-            document.getElementById('pause-screen').classList.add('hidden');
+            this.resume();
         }
     }
 
     resume() {
         this.isPaused = false;
-        this.inputKeys = {}; // Clear stuck inputs
-        document.getElementById('pause-screen').classList.add('hidden');
+        this.inputKeys = {}; // IMPORTANT: Flush all inputs
+        this.hideAllOverlays();
         window.focus();
     }
 
@@ -771,9 +803,16 @@ class ChronosEngine {
     }
 
     loop() {
-        if (!this.running) return;
-        this.update();
-        this.draw();
+        if (!this.running) {
+            this.loopInitiated = false; // Reset so it can be restarted
+            return;
+        }
+
+        if (!this.isPaused) {
+            this.update();
+            this.draw();
+        }
+
         requestAnimationFrame(() => this.loop());
     }
 }
