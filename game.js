@@ -41,10 +41,11 @@ class Player {
         if (this.vel.mag() > 0) {
             this.vel = this.vel.normalize().mult(this.speed);
             this.isMoving = true;
-            this.energy = Math.min(this.maxEnergy, this.energy + 0.1); // Slow recovery while moving
+            // Energy recharges ONLY while moving, and slower
+            this.energy = Math.min(this.maxEnergy, this.energy + 0.15);
         } else {
             this.isMoving = false;
-            this.energy = Math.min(this.maxEnergy, this.energy + 0.5); // Fast recovery while stopped
+            // No energy recharge while stopped
         }
 
         // Apply movement
@@ -146,48 +147,105 @@ class Projectile {
 class Enemy {
     constructor(x, y, type = 'fixed') {
         this.pos = new Vector(x, y);
-        this.type = type;
+        this.type = type; // fixed, drone, sniper, sentinel
         this.shotTimer = 0;
-        this.angle = 0;
         this.patrolStart = new Vector(x, y);
         this.patrolDir = 1;
+        this.chargeTimer = 0; // For Sniper laser warning
     }
 
     update(timeScale, playerPos) {
         if (this.type === 'drone') {
             this.pos.x += 2 * this.patrolDir * timeScale;
-            if (Math.abs(this.pos.x - this.patrolStart.x) > 100) this.patrolDir *= -1;
+            if (Math.abs(this.pos.x - this.patrolStart.x) > 150) this.patrolDir *= -1;
         }
 
+        const fireRate = this.getFireRate();
         this.shotTimer += timeScale;
-        if (this.shotTimer > 60) {
+
+        // Sniper Laser Telegraphing
+        if (this.type === 'sniper') {
+            if (this.shotTimer > fireRate * 0.6) {
+                this.chargeTimer = 1; // Start warning
+            } else {
+                this.chargeTimer = 0;
+            }
+        }
+
+        if (this.shotTimer > fireRate) {
             this.shoot(playerPos);
             this.shotTimer = 0;
+            this.chargeTimer = 0;
+        }
+    }
+
+    getFireRate() {
+        switch (this.type) {
+            case 'sentinel': return 15; // Rapid fire
+            case 'sniper': return 120; // Slow, powerful laser
+            case 'drone': return 80;
+            default: return 60;
         }
     }
 
     shoot(target) {
         const dir = target.sub(this.pos).normalize();
-        const vel = dir.mult(5);
-        game.projectiles.push(new Projectile(this.pos, vel));
+
+        if (this.type === 'sentinel') {
+            // Rifles have faster bullets
+            const vel = dir.mult(8);
+            game.projectiles.push(new Projectile(this.pos, vel, '#ffae00'));
+        } else if (this.type === 'sniper') {
+            // Snipers have extremely fast projectiles
+            const vel = dir.mult(15);
+            game.projectiles.push(new Projectile(this.pos, vel, '#00ff88'));
+        } else {
+            const vel = dir.mult(5);
+            game.projectiles.push(new Projectile(this.pos, vel));
+        }
     }
 
     draw(ctx) {
-        ctx.fillStyle = '#ff0055';
         ctx.shadowBlur = 15;
-        ctx.shadowColor = '#ff0055';
 
         if (this.type === 'fixed') {
+            ctx.fillStyle = '#ff0055';
+            ctx.shadowColor = '#ff0055';
             ctx.fillRect(this.pos.x - 15, this.pos.y - 15, 30, 30);
             ctx.strokeStyle = '#fff';
             ctx.strokeRect(this.pos.x - 15, this.pos.y - 15, 30, 30);
-        } else {
+        } else if (this.type === 'drone') {
+            ctx.fillStyle = '#ff00aa';
+            ctx.shadowColor = '#ff00aa';
             ctx.beginPath();
-            ctx.moveTo(this.pos.x, this.pos.y - 20);
-            ctx.lineTo(this.pos.x + 15, this.pos.y + 10);
-            ctx.lineTo(this.pos.x - 15, this.pos.y + 10);
+            ctx.moveTo(this.pos.x, this.pos.y - 15);
+            ctx.lineTo(this.pos.x + 15, this.pos.y + 15);
+            ctx.lineTo(this.pos.x - 15, this.pos.y + 15);
             ctx.closePath();
             ctx.fill();
+        } else if (this.type === 'sentinel') {
+            ctx.fillStyle = '#ffae00';
+            ctx.shadowColor = '#ffae00';
+            ctx.fillRect(this.pos.x - 10, this.pos.y - 20, 20, 40);
+            ctx.strokeRect(this.pos.x - 10, this.pos.y - 20, 20, 40);
+        } else if (this.type === 'sniper') {
+            ctx.fillStyle = '#00ff88';
+            ctx.shadowColor = '#00ff88';
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, 18, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Laser Warning Line
+            if (this.chargeTimer > 0) {
+                const targetDir = game.player.pos.sub(this.pos).normalize();
+                ctx.setLineDash([2, 5]);
+                ctx.strokeStyle = 'rgba(0, 255, 136, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(this.pos.x, this.pos.y);
+                ctx.lineTo(this.pos.x + targetDir.x * 2000, this.pos.y + targetDir.y * 2000);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
         ctx.shadowBlur = 0;
     }
@@ -230,40 +288,78 @@ class ChronosEngine {
 
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
+        this.player.pos = new Vector(80, centerY);
+        this.exit = new Vector(this.canvas.width - 80, centerY);
 
-        // Reset player and exit
-        this.player.pos = new Vector(100, centerY);
-        this.exit = new Vector(this.canvas.width - 100, centerY);
+        switch (n) {
+            case 1: // Tutorial: Basics
+                this.walls.push({ x: centerX, y: centerY - 100, w: 20, h: 200 });
+                this.enemies.push(new Enemy(centerX + 200, centerY, 'fixed'));
+                break;
+            case 2: // Tutorial: Movement
+                this.walls.push({ x: 300, y: 0, w: 20, h: centerY - 50 });
+                this.walls.push({ x: 300, y: centerY + 50, w: 20, h: centerY });
+                this.enemies.push(new Enemy(500, centerY - 100, 'fixed'));
+                this.enemies.push(new Enemy(500, centerY + 100, 'fixed'));
+                break;
+            case 3: // Intro Drones
+                this.enemies.push(new Enemy(centerX, centerY - 150, 'drone'));
+                this.enemies.push(new Enemy(centerX, centerY + 150, 'drone'));
+                this.walls.push({ x: centerX - 100, y: centerY - 20, w: 200, h: 40 });
+                break;
+            case 4: // Intro Sentinel (Rapid)
+                this.enemies.push(new Enemy(centerX + 100, centerY, 'sentinel'));
+                this.walls.push({ x: centerX - 50, y: 100, w: 20, h: 200 });
+                this.walls.push({ x: centerX - 50, y: centerY + 100, w: 20, h: 200 });
+                break;
+            case 5: // Intro Sniper (Laser)
+                this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'sniper'));
+                this.walls.push({ x: centerX, y: centerY - 50, w: 40, h: 100 });
+                break;
+            case 6: // The Maze
+                for (let i = 0; i < 5; i++) {
+                    this.walls.push({ x: 200 + i * 150, y: i % 2 ? 0 : 300, w: 30, h: 400 });
+                    this.enemies.push(new Enemy(200 + i * 150 + 60, centerY, 'drone'));
+                }
+                break;
+            case 7: // High Security
+                this.enemies.push(new Enemy(centerX, 150, 'sniper'));
+                this.enemies.push(new Enemy(centerX, this.canvas.height - 150, 'sniper'));
+                this.enemies.push(new Enemy(centerX + 150, centerY, 'sentinel'));
+                this.walls.push({ x: centerX - 100, y: centerY - 100, w: 200, h: 20 });
+                this.walls.push({ x: centerX - 100, y: centerY + 100, w: 200, h: 20 });
+                break;
+            case 8: // Corridor of Death
+                for (let i = 0; i < 4; i++) {
+                    this.enemies.push(new Enemy(200 + i * 200, 100, 'sentinel'));
+                    this.enemies.push(new Enemy(200 + i * 200, this.canvas.height - 100, 'sentinel'));
+                }
+                this.walls.push({ x: 150, y: centerY - 10, w: this.canvas.width - 300, h: 20 });
+                break;
+            case 9: // Sniper Valley
+                for (let i = 0; i < 3; i++) {
+                    this.enemies.push(new Enemy(centerX + (i * 100), 50 + (i * 200), 'sniper'));
+                    this.walls.push({ x: centerX - 150 + (i * 100), y: 150 + (i * 200), w: 100, h: 20 });
+                }
+                break;
+            case 10: // BOSS RUN: THE ARCHITECT'S WRATH
+                // Maximum difficulty: All types combined
+                this.enemies.push(new Enemy(centerX, centerY - 250, 'sniper'));
+                this.enemies.push(new Enemy(centerX, centerY + 250, 'sniper'));
+                this.enemies.push(new Enemy(centerX - 250, centerY, 'sentinel'));
+                this.enemies.push(new Enemy(centerX + 250, centerY, 'sentinel'));
+                this.enemies.push(new Enemy(centerX, centerY, 'fixed'));
 
-        if (n <= 2) { // Tutorials
-            this.walls.push({ x: centerX, y: centerY - 100, w: 20, h: 200 });
-            this.enemies.push(new Enemy(centerX + 150, centerY, 'fixed'));
-        }
-        else if (n <= 5) { // Intermediate: Lasers & Multiple Shooters
-            this.walls.push({ x: centerX - 100, y: 0, w: 30, h: centerY - 50 });
-            this.walls.push({ x: centerX - 100, y: centerY + 50, w: 30, h: centerY });
-            this.enemies.push(new Enemy(centerX + 100, centerY - 150, 'drone'));
-            this.enemies.push(new Enemy(centerX + 100, centerY + 150, 'drone'));
-            if (n > 3) this.enemies.push(new Enemy(centerX + 250, centerY, 'fixed'));
-        }
-        else if (n <= 9) { // Advanced: Mazes (Dash required)
-            for (let i = 0; i < n + 2; i++) {
-                let wx = 200 + (i * 120);
-                let wh = (i % 2 === 0) ? 400 : 300;
-                let wy = (i % 2 === 0) ? 0 : this.canvas.height - wh;
-                this.walls.push({ x: wx, y: wy, w: 40, h: wh });
-                this.enemies.push(new Enemy(wx + 60, centerY + (i % 2 ? -100 : 100), 'drone'));
-            }
-        }
-        else { // Level 10: The Ultimate Challenge
-            this.enemies.push(new Enemy(centerX, centerY - 200, 'fixed'));
-            this.enemies.push(new Enemy(centerX, centerY + 200, 'fixed'));
-            this.enemies.push(new Enemy(centerX - 200, centerY, 'drone'));
-            this.enemies.push(new Enemy(centerX + 200, centerY, 'drone'));
-            // Spiral walls
-            for (let i = 0; i < 8; i++) {
-                this.walls.push({ x: centerX + Math.cos(i) * 200, y: centerY + Math.sin(i) * 200, w: 40, h: 40 });
-            }
+                for (let i = 0; i < 12; i++) {
+                    const ang = (i / 12) * Math.PI * 2;
+                    const wx = centerX + Math.cos(ang) * 150;
+                    const wy = centerY + Math.sin(ang) * 150;
+                    this.walls.push({ x: wx - 20, y: wy - 20, w: 40, h: 40 });
+                }
+                // Moving Drones inside the ring
+                this.enemies.push(new Enemy(centerX - 50, centerY - 50, 'drone'));
+                this.enemies.push(new Enemy(centerX + 50, centerY + 50, 'drone'));
+                break;
         }
 
         document.getElementById('level-display').innerText = n.toString().padStart(2, '0');
