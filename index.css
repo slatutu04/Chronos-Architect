@@ -109,6 +109,21 @@ canvas {
     box-shadow: 0 0 10px #ff0000;
 }
 
+#key-display {
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: rgba(0, 0, 0, 0.4);
+    padding: 2px 15px;
+    border-radius: 0 0 10px 10px;
+}
+
 #key-display.complete {
     color: #00ff88;
     text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;

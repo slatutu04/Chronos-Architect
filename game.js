@@ -95,19 +95,25 @@ class Player {
 }
 
 class Projectile {
-    constructor(pos, vel, color = '#ff0055') {
+    constructor(pos, vel, color = '#ff0055', canPenetrate = false) {
         this.pos = pos;
         this.vel = vel;
         this.color = color;
         this.radius = 4;
         this.active = true;
+        this.canPenetrate = canPenetrate;
     }
 
     update(timeScale) {
         const scaledVel = this.vel.mult(timeScale);
         this.pos = this.pos.add(scaledVel);
 
-        // Kill bullet if it goes too far out of screenspace (munição atravessa as paredes)
+        // Only collide with walls if NOT a Sniper projectile
+        if (!this.canPenetrate && game.checkCollision(this.pos, this.radius)) {
+            this.active = false;
+        }
+
+        // Kill bullet if it goes too far out of screenspace
         if (this.pos.x < -1000 || this.pos.x > 5000 || this.pos.y < -1000 || this.pos.y > 5000) {
             this.active = false;
         }
@@ -185,11 +191,12 @@ class Enemy {
     shoot(target) {
         const dir = target.sub(this.pos).normalize();
         if (this.type === 'sentinel') {
-            game.projectiles.push(new Projectile(this.pos, dir.mult(8), '#ffae00'));
+            game.projectiles.push(new Projectile(this.pos, dir.mult(8), '#ffae00', false));
         } else if (this.type === 'sniper') {
-            game.projectiles.push(new Projectile(this.pos, dir.mult(22), '#00ff88'));
+            // ONLY Sniper penetrates walls (true flag)
+            game.projectiles.push(new Projectile(this.pos, dir.mult(22), '#00ff88', true));
         } else {
-            game.projectiles.push(new Projectile(this.pos, dir.mult(5)));
+            game.projectiles.push(new Projectile(this.pos, dir.mult(5), '#ff0055', false));
         }
     }
 
@@ -382,14 +389,16 @@ class ChronosEngine {
                 this.keysRequired = 1;
                 this.keys.push(new Key(centerX, 100));
                 this.enemies.push(new Enemy(centerX, centerY, 'sentinel'));
-                this.walls.push({ x: centerX - 50, y: centerY - 50, w: 100, h: 100 });
+                // Removed wall around sentinel as requested
                 break;
             case 12:
                 this.keysRequired = 2;
                 this.keys.push(new Key(100, 100));
                 this.keys.push(new Key(100, this.canvas.height - 100));
                 this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'drone'));
-                this.walls.push({ x: centerX, y: 0, w: 20, h: this.canvas.height });
+                // Fixed wall: added passage in the middle
+                this.walls.push({ x: centerX, y: 0, w: 20, h: centerY - 100 });
+                this.walls.push({ x: centerX, y: centerY + 100, w: 20, h: centerY });
                 break;
             case 13:
                 this.keysRequired = 3;

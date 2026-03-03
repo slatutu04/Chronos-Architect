@@ -15,45 +15,45 @@
     <div id="game-container">
         <div id="time-overlay"></div>
 
+        <div id="key-display" class="hidden">Chaves: 0/0</div>
+
         <div id="hud">
             <div class="hud-item">
                 <span class="label">Fase</span>
                 <span id="level-display" class="value">01</span>
             </div>
             <div class="hud-item">
-                <span class="label">Objetivo</span>
-                <span id="key-display" class="value hidden">Chaves: 0/0</span>
+                <span class="label">Sonda de Luz</span>
+                <div class="energy-container">
+                    <div id="energy-fill"></div>
+                </div>
             </div>
             <div class="hud-item">
-                <div id="energy-fill"></div>
+                <span class="label">Estado</span>
+                <span id="time-state" class="value">TEMPO REAL</span>
             </div>
         </div>
-        <div class="hud-item">
-            <span class="label">Estado</span>
-            <span id="time-state" class="value">TEMPO REAL</span>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen-overlay">
+            <h1>Chronos Architect</h1>
+            <p style="margin-bottom: 30px; letter-spacing: 2px; opacity: 0.8;">O tempo move-se quando você se move.</p>
+            <button class="btn" onclick="game.start()">Iniciar Protocolo</button>
         </div>
-    </div>
 
-    <canvas id="gameCanvas"></canvas>
+        <!-- Level Clear Screen -->
+        <div id="clear-screen" class="screen-overlay hidden">
+            <h1 style="color: var(--energy-color);">Nível Concluído</h1>
+            <button class="btn" onclick="game.nextLevel()">Próximo Nível</button>
+        </div>
 
-    <!-- Start Screen -->
-    <div id="start-screen" class="screen-overlay">
-        <h1>Chronos Architect</h1>
-        <p style="margin-bottom: 30px; letter-spacing: 2px; opacity: 0.8;">O tempo move-se quando você se move.</p>
-        <button class="btn" onclick="game.start()">Iniciar Protocolo</button>
-    </div>
-
-    <!-- Level Clear Screen -->
-    <div id="clear-screen" class="screen-overlay hidden">
-        <h1 style="color: var(--energy-color);">Nível Concluído</h1>
-        <button class="btn" onclick="game.nextLevel()">Próximo Nível</button>
-    </div>
-
-    <!-- Game Over Screen -->
-    <div id="death-screen" class="screen-overlay hidden">
-        <h1 style="color: var(--enemy-color);">Conexão Perdida</h1>
-        <button class="btn" onclick="game.restartLevel()">Tentar Novamente</button>
-    </div>
+        <!-- Game Over Screen -->
+        <div id="death-screen" class="screen-overlay hidden">
+            <h1 style="color: var(--enemy-color);">Conexão Perdida</h1>
+            <button class="btn" onclick="game.restartLevel()">Tentar Novamente</button>
+        </div>
     </div>
 
     <!-- Main Game Logic -->
