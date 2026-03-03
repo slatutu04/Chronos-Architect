@@ -288,3 +288,50 @@ h1 {
 .glitch-text:hover {
     animation: glitch 0.3s infinite;
 }
+
+.level-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+    max-width: 600px;
+}
+
+.level-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.level-btn:hover {
+    background: rgba(0, 255, 136, 0.2);
+    border-color: #00ff88;
+}
+
+.level-btn.selected {
+    background: #00ff88 !important;
+    color: black !important;
+    box-shadow: 0 0 15px #00ff88;
+    font-weight: bold;
+}
+
+.menu-options-row {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.btn-primary {
+    background: rgba(0, 255, 136, 0.1);
+    border-color: #00ff88;
+    color: #00ff88;
+}

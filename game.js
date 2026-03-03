@@ -54,7 +54,7 @@ class Player {
             this.pos = nextPos;
         }
 
-        if (keys[' '] && this.energy >= 30 && this.dashCooldown <= 0) {
+        if (keys[' '] && this.energy >= 30 && this.dashCooldown <= 0 && !game.isTimestopped) {
             this.dash();
         }
 
@@ -293,7 +293,8 @@ class ChronosEngine {
         this.running = false;
         this.isPaused = false;
         this.loopInitiated = false; // Add guard for single loop
-        this.returningScreen = 'start-screen'; // Track where to return from controls
+        this.returningScreen = 'start-screen';
+        this.selectedLevel = 1; // Track selection in menu
 
         // Time Stop Stats
         this.timestopEnergy = 100;
@@ -608,16 +609,63 @@ class ChronosEngine {
     }
 
     hideAllOverlays() {
-        const screens = ['start-screen', 'pause-screen', 'controls-screen', 'death-screen', 'clear-screen', 'unlock-screen', 'quit-screen'];
+        const screens = ['start-screen', 'pause-screen', 'controls-screen', 'level-select-screen', 'death-screen', 'clear-screen', 'unlock-screen', 'quit-screen'];
         screens.forEach(s => {
             const el = document.getElementById(s);
             if (el) el.classList.add('hidden');
         });
     }
 
+    showLevelSelect() {
+        this.returningScreen = 'start-screen';
+        this.openLevelSelect();
+    }
+
+    showLevelSelectFromPause() {
+        this.returningScreen = 'pause-screen';
+        this.openLevelSelect();
+    }
+
+    openLevelSelect() {
+        this.hideAllOverlays();
+        const grid = document.getElementById('level-grid');
+        grid.innerHTML = '';
+        this.selectedLevel = this.level;
+
+        for (let i = 1; i <= this.maxLevels; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'level-btn' + (i === this.selectedLevel ? ' selected' : '');
+            btn.innerText = i;
+            btn.onclick = () => {
+                document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                this.selectedLevel = i;
+            };
+            grid.appendChild(btn);
+        }
+        document.getElementById('level-select-screen').classList.remove('hidden');
+    }
+
+    confirmLevelSelect() {
+        this.level = this.selectedLevel;
+        // If they select level 16+, assume they unlocked it for testing
+        if (this.level >= 16) this.timestopUnlocked = true;
+
+        this.hideAllOverlays();
+        this.running = true;
+        this.isPaused = false;
+        this.initLevel(this.level);
+        if (!this.loopInitiated) {
+            this.loopInitiated = true;
+            this.loop();
+        }
+        window.focus();
+    }
+
     handleEscape() {
-        // If in controls, go back
-        if (!document.getElementById('controls-screen').classList.contains('hidden')) {
+        // If in controls or level select, go back
+        if (!document.getElementById('controls-screen').classList.contains('hidden') ||
+            !document.getElementById('level-select-screen').classList.contains('hidden')) {
             this.showMenu();
             return;
         }
