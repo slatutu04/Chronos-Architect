@@ -1,0 +1,157 @@
+:root {
+    --bg-color: #050505;
+    --player-color: #00f2ff;
+    --enemy-color: #ff0055;
+    --wall-color: #1a1a1a;
+    --energy-color: #00ff88;
+    --ui-font: 'Outfit', sans-serif;
+    --transition-speed: 0.3s;
+}
+
+body,
+html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+    color: white;
+    font-family: var(--ui-font);
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+    background: radial-gradient(circle at center, #111 0%, #050505 100%);
+}
+
+canvas {
+    display: block;
+}
+
+/* TimeScale Filter Overlay */
+#time-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    transition: filter var(--transition-speed), backdrop-filter var(--transition-speed);
+}
+
+.slow-mo {
+    backdrop-filter: grayscale(100%) contrast(120%);
+}
+
+/* HUD Styling */
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 40px;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    padding: 10px 30px;
+    border-radius: 100px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10;
+}
+
+.hud-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.6;
+    margin-bottom: 4px;
+}
+
+.value {
+    font-weight: 700;
+    font-size: 18px;
+}
+
+/* Energy Bar */
+.energy-container {
+    width: 200px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+#energy-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, var(--energy-color), #00ffea);
+    transition: width 0.1s ease-out;
+    box-shadow: 0 0 10px var(--energy-color);
+}
+
+/* Level Start / Game Over Overlays */
+.screen-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 20;
+    transition: opacity 0.5s ease;
+}
+
+.hidden {
+    display: none;
+    opacity: 0;
+}
+
+h1 {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, var(--player-color), #fff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 10px;
+}
+
+.btn {
+    padding: 15px 40px;
+    background: transparent;
+    border: 2px solid var(--player-color);
+    color: var(--player-color);
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 1rem;
+    font-weight: bold;
+}
+
+.btn:hover {
+    background: var(--player-color);
+    color: black;
+    box-shadow: 0 0 20px var(--player-color);
+}
