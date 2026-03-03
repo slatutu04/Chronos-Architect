@@ -566,11 +566,25 @@ class ChronosEngine {
     }
 
     start() {
+        // Clear all inputs just in case
+        this.inputKeys = {};
+
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('controls-screen').classList.add('hidden');
+
+        // Prevent multiple loop instances
+        const wasRunning = this.running;
         this.running = true;
+        this.isPaused = false;
+
         this.initLevel(this.level);
-        this.loop();
+
+        if (!wasRunning) {
+            this.loop();
+        }
+
+        // Ensure the game window has focus for keyboard input
+        window.focus();
     }
 
     showControls() {
@@ -649,7 +663,9 @@ class ChronosEngine {
 
     resume() {
         this.isPaused = false;
+        this.inputKeys = {}; // Clear stuck inputs
         document.getElementById('pause-screen').classList.add('hidden');
+        window.focus();
     }
 
     showControlsFromPause() {
