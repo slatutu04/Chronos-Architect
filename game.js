@@ -292,6 +292,8 @@ class ChronosEngine {
         this.inputKeys = {};
         this.running = false;
         this.isPaused = false;
+        this.loopInitiated = false; // Add guard for single loop
+        this.returningScreen = 'start-screen'; // Track where to return from controls
 
         // Time Stop Stats
         this.timestopEnergy = 100;
@@ -566,35 +568,32 @@ class ChronosEngine {
     }
 
     start() {
-        // Clear all inputs just in case
         this.inputKeys = {};
-
         document.getElementById('start-screen').classList.add('hidden');
         document.getElementById('controls-screen').classList.add('hidden');
 
-        // Prevent multiple loop instances
-        const wasRunning = this.running;
         this.running = true;
         this.isPaused = false;
-
         this.initLevel(this.level);
 
-        if (!wasRunning) {
+        // ONLY call loop if it has never been started
+        if (!this.loopInitiated) {
+            this.loopInitiated = true;
             this.loop();
         }
-
-        // Ensure the game window has focus for keyboard input
         window.focus();
     }
 
     showControls() {
+        this.returningScreen = 'start-screen';
         document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('pause-screen').classList.add('hidden');
         document.getElementById('controls-screen').classList.remove('hidden');
     }
 
     showMenu() {
         document.getElementById('controls-screen').classList.add('hidden');
-        document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById(this.returningScreen).classList.remove('hidden');
     }
 
     quit() {
@@ -669,8 +668,9 @@ class ChronosEngine {
     }
 
     showControlsFromPause() {
+        this.returningScreen = 'pause-screen';
         document.getElementById('pause-screen').classList.add('hidden');
-        this.showControls();
+        document.getElementById('controls-screen').classList.remove('hidden');
     }
 
     update() {
