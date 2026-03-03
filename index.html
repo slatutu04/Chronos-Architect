@@ -36,11 +36,44 @@
 
         <canvas id="gameCanvas"></canvas>
 
-        <!-- Start Screen -->
+        <!-- Main Menu -->
         <div id="start-screen" class="screen-overlay">
-            <h1>Chronos Architect</h1>
-            <p style="margin-bottom: 30px; letter-spacing: 2px; opacity: 0.8;">O tempo move-se quando você se move.</p>
-            <button class="btn" onclick="game.start()">Iniciar Protocolo</button>
+            <h1 class="glitch-text">Chronos Architect</h1>
+            <p style="margin-bottom: 30px; letter-spacing: 2px; opacity: 0.8; text-transform: uppercase;">Time is a
+                slave to movement</p>
+
+            <div class="menu-options">
+                <button class="btn menu-btn" onclick="game.start()">Iniciar Protocolo</button>
+                <button class="btn menu-btn" onclick="game.showControls()">Controles</button>
+                <button class="btn menu-btn" onclick="game.quit()">Sair</button>
+            </div>
+        </div>
+
+        <!-- Controls Screen -->
+        <div id="controls-screen" class="screen-overlay hidden">
+            <h1>Controles</h1>
+            <div class="controls-list">
+                <div class="control-item">
+                    <span class="key">WASD / Setas</span>
+                    <span class="desc">Movimentação da Sonda</span>
+                </div>
+                <div class="control-item">
+                    <span class="key">Espaço</span>
+                    <span class="desc">Time-Sync Dash (Habilidade)</span>
+                </div>
+                <div class="control-item">
+                    <span class="key">Parado</span>
+                    <span class="desc">Câmera Lenta (Slow Motion)</span>
+                </div>
+            </div>
+            <button class="btn" style="margin-top: 40px;" onclick="game.showMenu()">Voltar</button>
+        </div>
+
+        <!-- Quit Screen -->
+        <div id="quit-screen" class="screen-overlay hidden">
+            <h1>Conexão Encerrada</h1>
+            <p>Obrigado por utilizar o Arquiteto de Chronos.</p>
+            <button class="btn" style="margin-top: 20px;" onclick="location.reload()">Reconectar</button>
         </div>
 
         <!-- Level Clear Screen -->

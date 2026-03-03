@@ -477,9 +477,28 @@ class ChronosEngine {
 
     start() {
         document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('controls-screen').classList.add('hidden');
         this.running = true;
         this.initLevel(this.level);
         this.loop();
+    }
+
+    showControls() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('controls-screen').classList.remove('hidden');
+    }
+
+    showMenu() {
+        document.getElementById('controls-screen').classList.add('hidden');
+        document.getElementById('start-screen').classList.remove('hidden');
+    }
+
+    quit() {
+        this.running = false;
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('quit-screen').classList.remove('hidden');
+        // window.close() usually fails in modern browsers unless opened by script, 
+        // so we show a dedicated "Connection Terminated" screen.
     }
 
     gameOver() {
