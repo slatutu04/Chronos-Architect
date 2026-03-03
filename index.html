@@ -22,10 +22,19 @@
                 <span class="label">Fase</span>
                 <span id="level-display" class="value">01</span>
             </div>
-            <div class="hud-item">
-                <span class="label">Sonda de Luz</span>
-                <div class="energy-container">
-                    <div id="energy-fill"></div>
+            <div class="hud-item hud-energy-group">
+                <div class="energy-label-pair">
+                    <span class="label">Dash</span>
+                    <div class="energy-container">
+                        <div id="energy-fill"></div>
+                    </div>
+                </div>
+                <div id="timestop-hud-container" class="energy-label-pair hidden">
+                    <span class="label">Time Stop</span>
+                    <div class="energy-container timestop-container">
+                        <div id="timestop-fill"></div>
+                    </div>
+                    <span id="timestop-uses" class="label" style="margin-left: 5px;">Uses: 2/2</span>
                 </div>
             </div>
             <div class="hud-item">
@@ -62,6 +71,15 @@
                     <span class="desc">Time-Sync Dash (Habilidade)</span>
                 </div>
                 <div class="control-item">
+                    <span class="key">R</span>
+                    <span class="desc">Time Stop<br><small style="color: #666;">Disponível apenas nas fases
+                            16+</small></span>
+                </div>
+                <div class="control-item">
+                    <span class="key">Esc</span>
+                    <span class="desc">Pausar Jogo</span>
+                </div>
+                <div class="control-item">
                     <span class="key">Parado</span>
                     <span class="desc">Câmera Lenta (Slow Motion)</span>
                 </div>
@@ -74,6 +92,30 @@
             <h1>Conexão Encerrada</h1>
             <p>Obrigado por utilizar o Arquiteto de Chronos.</p>
             <button class="btn" style="margin-top: 20px;" onclick="location.reload()">Reconectar</button>
+        </div>
+
+        <!-- Pause Menu -->
+        <div id="pause-screen" class="screen-overlay hidden">
+            <h1>Jogo Pausado</h1>
+            <div class="menu-options">
+                <button class="btn menu-btn" onclick="game.resume()">Retomar</button>
+                <button class="btn menu-btn" onclick="game.showControlsFromPause()">Controles</button>
+                <button class="btn menu-btn" onclick="game.quit()">Sair</button>
+            </div>
+        </div>
+
+        <!-- Unlock Cutscene -->
+        <div id="unlock-screen" class="screen-overlay hidden">
+            <h1 style="color: #fff100; font-size: 3rem;">NOVO MÓDULO: TIME STOP</h1>
+            <p style="text-align: center; max-width: 600px; line-height: 1.6; letter-spacing: 1px;">
+                Você superou as barreiras físicas de Chronos. <br>
+                Sua consciência agora permite ancorar o tempo. <br><br>
+                Pressione <span style="color: #fff100; font-weight: bold;">[R]</span> para parar o tempo.<br>
+                Energia consumida apenas por movimento.<br>
+                Uso limitado. Use com sabedoria.
+            </p>
+            <button class="btn" style="margin-top: 40px; border-color: #fff100; color: #fff100;"
+                onclick="game.finalizeUnlock()">Continuar</button>
         </div>
 
         <!-- Level Clear Screen -->

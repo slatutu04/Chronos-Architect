@@ -287,12 +287,23 @@ class ChronosEngine {
         this.keysFound = 0;
         this.exit = null;
         this.level = 1;
-        this.maxLevels = 15;
+        this.maxLevels = 20; // 15 original + 5 new
         this.globalTimeFactor = 0.05;
         this.inputKeys = {};
         this.running = false;
+        this.isPaused = false;
 
-        window.addEventListener('keydown', e => this.inputKeys[e.key] = true);
+        // Time Stop Stats
+        this.timestopEnergy = 100;
+        this.isTimestopped = false;
+        this.timestopUses = 2;
+        this.timestopUnlocked = false;
+
+        window.addEventListener('keydown', e => {
+            this.inputKeys[e.key] = true;
+            if (e.key === 'r' || e.key === 'R') this.toggleTimestop();
+            if (e.key === 'Escape') this.togglePause();
+        });
         window.addEventListener('keyup', e => this.inputKeys[e.key] = false);
         window.addEventListener('resize', () => this.resize());
     }
@@ -424,7 +435,64 @@ class ChronosEngine {
                 this.enemies.push(new Enemy(centerX, 100, 'sentinel'));
                 this.enemies.push(new Enemy(centerX, this.canvas.height - 100, 'sentinel'));
                 break;
+
+            // CHALLENGE LEVELS (16-20) - TIME STOP MECHANIC
+            case 16:
+                this.enemies.push(new Enemy(400, centerY, 'sniper'));
+                this.enemies.push(new Enemy(centerX + 200, centerY - 150, 'sentinel'));
+                this.walls.push({ x: centerX, y: 0, w: 20, h: this.canvas.height });
+                break;
+            case 17:
+                this.keysRequired = 2;
+                this.keys.push(new Key(centerX, 100));
+                this.keys.push(new Key(centerX, this.canvas.height - 100));
+                for (let i = 0; i < 4; i++) this.enemies.push(new Enemy(centerX + (i * 100), centerY + (i % 2 ? 50 : -50), 'sentinel'));
+                break;
+            case 18: // THE GREAT MAZE
+                this.keysRequired = 3;
+                // Maze Walls
+                for (let i = 1; i < 6; i++) {
+                    let wx = i * 200;
+                    this.walls.push({ x: wx, y: (i % 2 ? 0 : 300), w: 30, h: 450 });
+                }
+                this.keys.push(new Key(250, 100));
+                this.keys.push(new Key(650, 500));
+                this.keys.push(new Key(1050, 100));
+                // Sniper coverage
+                for (let i = 0; i < 5; i++) this.enemies.push(new Enemy(300 + i * 250, centerY, 'sniper'));
+                break;
+            case 19:
+                this.enemies.push(new Enemy(centerX, centerY, 'fixed'));
+                for (let i = 0; i < 8; i++) {
+                    const ang = (i / 8) * Math.PI * 2;
+                    this.enemies.push(new Enemy(centerX + Math.cos(ang) * 300, centerY + Math.sin(ang) * 300, 'sniper'));
+                }
+                break;
+            case 20: // FINAL BOSS: THE TIME ENGINE
+                this.keysRequired = 1;
+                this.keys.push(new Key(centerX, centerY));
+                for (let i = 0; i < 10; i++) {
+                    this.enemies.push(new Enemy(Math.random() * this.canvas.width, Math.random() * this.canvas.height, 'sentinel'));
+                }
+                for (let i = 0; i < 4; i++) {
+                    this.enemies.push(new Enemy(i * 300 + 100, 100, 'sniper'));
+                    this.enemies.push(new Enemy(i * 300 + 100, this.canvas.height - 100, 'sniper'));
+                }
+                break;
         }
+
+        // Show Time Stop HUD only on 16+
+        const tsHud = document.getElementById('timestop-hud-container');
+        if (n >= 16) {
+            tsHud.classList.remove('hidden');
+        } else {
+            tsHud.classList.add('hidden');
+        }
+
+        this.timestopUses = 2; // Reset uses per level
+        this.timestopEnergy = 100;
+        this.isTimestopped = false;
+        this.updateTimeStopUI();
 
         if (this.keysRequired > 0) {
             keyDisplay.classList.remove('hidden');
@@ -434,6 +502,28 @@ class ChronosEngine {
             document.getElementById('hud').classList.remove('hud-shifted');
         }
         document.getElementById('level-display').innerText = n.toString().padStart(2, '0');
+    }
+
+    toggleTimestop() {
+        if (!this.running || this.level < 16) return;
+
+        if (!this.isTimestopped) {
+            if (this.timestopUses > 0 && this.timestopEnergy > 10) {
+                this.isTimestopped = true;
+                this.timestopUses--;
+                this.createParticles(this.player.pos, '#fff100', 50);
+            }
+        } else {
+            this.isTimestopped = false;
+        }
+        this.updateTimeStopUI();
+    }
+
+    updateTimeStopUI() {
+        const fill = document.getElementById('timestop-fill');
+        const usesTxt = document.getElementById('timestop-uses');
+        if (fill) fill.style.width = this.timestopEnergy + '%';
+        if (usesTxt) usesTxt.innerText = `Uses: ${this.timestopUses}/2`;
     }
 
     onKeyCollected() {
@@ -514,10 +604,16 @@ class ChronosEngine {
     }
 
     nextLevel() {
+        if (this.level === 15 && !this.timestopUnlocked) {
+            this.showUnlockCutscene();
+            return;
+        }
+
         this.level++;
         if (this.level > this.maxLevels) {
-            alert("VOCÊ ESCAPOU! ARQUITETO DE CHRONOS.");
+            alert("MISÃO CUMPRIDA! VOCÊ DOMINOU O TEMPO.");
             this.level = 1;
+            this.timestopUnlocked = false;
         }
         document.getElementById('clear-screen').classList.add('hidden');
         this.initLevel(this.level);
@@ -525,28 +621,104 @@ class ChronosEngine {
         this.loop();
     }
 
-    update() {
-        if (!this.running) return;
-        this.globalTimeFactor = this.player.isMoving ? 1.0 : 0.05;
-        const energyFill = document.getElementById('energy-fill');
-        energyFill.style.width = this.player.energy + '%';
-        if (this.player.energy < 30) {
-            energyFill.classList.add('low-energy');
+    showUnlockCutscene() {
+        this.running = false;
+        document.getElementById('clear-screen').classList.add('hidden');
+        document.getElementById('unlock-screen').classList.remove('hidden');
+    }
+
+    finalizeUnlock() {
+        this.timestopUnlocked = true;
+        document.getElementById('unlock-screen').classList.add('hidden');
+        this.level = 16;
+        this.initLevel(this.level);
+        this.running = true;
+        this.loop();
+    }
+
+    togglePause() {
+        if (!this.running && !this.isPaused) return; // Only pause during active play
+
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            document.getElementById('pause-screen').classList.remove('hidden');
         } else {
-            energyFill.classList.remove('low-energy');
+            document.getElementById('pause-screen').classList.add('hidden');
         }
-        document.getElementById('time-state').innerText = this.player.isMoving ? 'TEMPO REAL' : 'SLOW MOTION';
-        document.getElementById('time-overlay').className = this.player.isMoving ? '' : 'slow-mo';
-        this.player.update(this.inputKeys, this.canvas);
-        this.enemies.forEach(e => e.update(this.globalTimeFactor, this.player.pos));
-        this.keys.forEach(k => k.update());
-        this.projectiles.forEach(p => p.update(this.globalTimeFactor));
-        this.projectiles = this.projectiles.filter(p => p.active);
-        this.particles.forEach(p => {
-            p.pos = p.pos.add(p.vel);
-            p.life -= 0.02;
-        });
-        this.particles = this.particles.filter(p => p.life > 0);
+    }
+
+    resume() {
+        this.isPaused = false;
+        document.getElementById('pause-screen').classList.add('hidden');
+    }
+
+    showControlsFromPause() {
+        document.getElementById('pause-screen').classList.add('hidden');
+        this.showControls();
+    }
+
+    update() {
+        if (!this.running || this.isPaused) return;
+
+        if (this.isTimestopped) {
+            // TIME STOP MODES
+            document.getElementById('time-overlay').className = 'timestop-active';
+            document.getElementById('time-state').innerText = 'TIME STOP';
+
+            this.player.update(this.inputKeys, this.canvas);
+
+            // Drain energy if moving
+            if (this.player.isMoving) {
+                this.timestopEnergy -= 0.8;
+                if (this.timestopEnergy <= 0) {
+                    this.timestopEnergy = 0;
+                    this.isTimestopped = false;
+                }
+            }
+            this.updateTimeStopUI();
+
+            // Particles and Key collection still work
+            this.particles.forEach(p => {
+                p.pos = p.pos.add(p.vel);
+                p.life -= 0.02;
+            });
+            this.particles = this.particles.filter(p => p.life > 0);
+            this.keys.forEach(k => k.update());
+
+        } else {
+            // NORMAL MODES
+            this.globalTimeFactor = this.player.isMoving ? 1.0 : 0.05;
+
+            // Slowly recharge Time Stop energy
+            if (this.level >= 16 && this.timestopEnergy < 100) {
+                this.timestopEnergy += 0.02;
+                this.updateTimeStopUI();
+            }
+
+            const energyFill = document.getElementById('energy-fill');
+            energyFill.style.width = this.player.energy + '%';
+            if (this.player.energy < 30) {
+                energyFill.classList.add('low-energy');
+            } else {
+                energyFill.classList.remove('low-energy');
+            }
+
+            document.getElementById('time-state').innerText = this.player.isMoving ? 'TEMPO REAL' : 'SLOW MOTION';
+            document.getElementById('time-overlay').className = this.player.isMoving ? '' : 'slow-mo';
+
+            this.player.update(this.inputKeys, this.canvas);
+            this.enemies.forEach(e => e.update(this.globalTimeFactor, this.player.pos));
+            this.keys.forEach(k => k.update());
+            this.projectiles.forEach(p => p.update(this.globalTimeFactor));
+            this.projectiles = this.projectiles.filter(p => p.active);
+
+            this.particles.forEach(p => {
+                p.pos = p.pos.add(p.vel);
+                p.life -= 0.02;
+            });
+            this.particles = this.particles.filter(p => p.life > 0);
+        }
+
         if (this.player.pos.dist(this.exit) < 30 && this.keysFound >= this.keysRequired) {
             this.running = false;
             document.getElementById('clear-screen').classList.remove('hidden');

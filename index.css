@@ -57,15 +57,27 @@ canvas {
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 40px;
+    gap: 25px;
     align-items: center;
     background: rgba(255, 255, 255, 0.05);
     backdrop-filter: blur(10px);
-    padding: 10px 30px;
+    padding: 10px 25px;
     border-radius: 100px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 10;
     transition: top 0.3s ease;
+}
+
+.hud-energy-group {
+    display: flex;
+    gap: 25px;
+    align-items: center;
+}
+
+.energy-label-pair {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
 #hud.hud-shifted {
@@ -93,12 +105,24 @@ canvas {
 
 /* Energy Bar */
 .energy-container {
-    width: 200px;
-    height: 8px;
+    width: 140px;
+    height: 6px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 4px;
     overflow: hidden;
-    margin-top: 5px;
+    margin-top: 3px;
+}
+
+.timestop-container {
+    border: 1px solid rgba(255, 241, 0, 0.3);
+}
+
+#timestop-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #fff100, #ffae00);
+    transition: width 0.1s ease-out;
+    box-shadow: 0 0 10px #fff100;
 }
 
 #energy-fill {
