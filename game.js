@@ -41,8 +41,8 @@ class Player {
         if (this.vel.mag() > 0) {
             this.vel = this.vel.normalize().mult(this.speed);
             this.isMoving = true;
-            // Energy recharges ONLY while moving, and slower
-            this.energy = Math.min(this.maxEnergy, this.energy + 0.15);
+            // Recharge energy only when moving (Real Time), and recharge faster
+            this.energy = Math.min(this.maxEnergy, this.energy + 0.45); // Slightly faster (was 0.15)
         } else {
             this.isMoving = false;
             // No energy recharge while stopped
@@ -442,9 +442,13 @@ class ChronosEngine {
 
             // CHALLENGE LEVELS (16-20) - TIME STOP MECHANIC
             case 16:
-                this.enemies.push(new Enemy(400, centerY, 'sniper'));
+                this.enemies.push(new Enemy(400, centerY - 100, 'sniper'));
+                this.enemies.push(new Enemy(400, centerY + 100, 'sniper'));
                 this.enemies.push(new Enemy(centerX + 200, centerY - 150, 'sentinel'));
-                this.walls.push({ x: centerX, y: 0, w: 20, h: this.canvas.height });
+                this.enemies.push(new Enemy(centerX + 200, centerY + 150, 'sentinel'));
+                // Wall with Gap in the middle (fixed "impossible" block)
+                this.walls.push({ x: centerX, y: 0, w: 20, h: centerY - 100 });
+                this.walls.push({ x: centerX, y: centerY + 100, w: 20, h: this.canvas.height - (centerY + 100) });
                 break;
             case 17:
                 this.keysRequired = 2;
@@ -737,9 +741,9 @@ class ChronosEngine {
             // NORMAL MODES
             this.globalTimeFactor = this.player.isMoving ? 1.0 : 0.05;
 
-            // Slowly recharge Time Stop energy
+            // Significantly faster recharge for Time Stop (was 0.02)
             if (this.level >= 16 && this.timestopEnergy < 100) {
-                this.timestopEnergy += 0.02;
+                this.timestopEnergy += 0.15;
                 this.updateTimeStopUI();
             }
 
