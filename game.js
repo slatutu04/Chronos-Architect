@@ -64,7 +64,6 @@ class Player {
     dash() {
         const dashDir = this.vel.mag() > 0 ? this.vel.normalize() : new Vector(1, 0);
         const dashDist = 120;
-        const targetPos = this.pos.add(dashDir.mult(dashDist));
 
         // Simple raycast for dash collision
         let step = dashDir.mult(5);
@@ -82,19 +81,15 @@ class Player {
     }
 
     draw(ctx) {
-        // Glow effect
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#00f2ff';
-
         ctx.fillStyle = '#fff';
         ctx.beginPath();
         ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
-
         ctx.strokeStyle = '#00f2ff';
         ctx.lineWidth = 2;
         ctx.stroke();
-
         ctx.shadowBlur = 0;
     }
 }
@@ -112,7 +107,8 @@ class Projectile {
         const scaledVel = this.vel.mult(timeScale);
         this.pos = this.pos.add(scaledVel);
 
-        if (game.checkCollision(this.pos, this.radius)) {
+        // Kill bullet if it goes too far out of screenspace (munição atravessa as paredes)
+        if (this.pos.x < -1000 || this.pos.x > 5000 || this.pos.y < -1000 || this.pos.y > 5000) {
             this.active = false;
         }
 
@@ -122,13 +118,12 @@ class Projectile {
     }
 
     draw(ctx, timeScale) {
-        // Ghost Path (Only when slow-mo)
         if (timeScale < 0.5) {
             ctx.setLineDash([5, 5]);
             ctx.strokeStyle = 'rgba(255, 0, 85, 0.3)';
             ctx.beginPath();
             ctx.moveTo(this.pos.x, this.pos.y);
-            const futurePos = this.pos.add(this.vel.mult(60)); // Show 1 second ahead
+            const futurePos = this.pos.add(this.vel.mult(60));
             ctx.lineTo(futurePos.x, futurePos.y);
             ctx.stroke();
             ctx.setLineDash([]);
@@ -147,11 +142,11 @@ class Projectile {
 class Enemy {
     constructor(x, y, type = 'fixed') {
         this.pos = new Vector(x, y);
-        this.type = type; // fixed, drone, sniper, sentinel
+        this.type = type;
         this.shotTimer = 0;
         this.patrolStart = new Vector(x, y);
         this.patrolDir = 1;
-        this.chargeTimer = 0; // For Sniper laser warning
+        this.chargeTimer = 0;
     }
 
     update(timeScale, playerPos) {
@@ -163,10 +158,9 @@ class Enemy {
         const fireRate = this.getFireRate();
         this.shotTimer += timeScale;
 
-        // Sniper Laser Telegraphing
         if (this.type === 'sniper') {
             if (this.shotTimer > fireRate * 0.6) {
-                this.chargeTimer = 1; // Start warning
+                this.chargeTimer = 1;
             } else {
                 this.chargeTimer = 0;
             }
@@ -181,8 +175,8 @@ class Enemy {
 
     getFireRate() {
         switch (this.type) {
-            case 'sentinel': return 15; // Rapid fire
-            case 'sniper': return 120; // Slow, powerful laser
+            case 'sentinel': return 15;
+            case 'sniper': return 120;
             case 'drone': return 80;
             default: return 60;
         }
@@ -190,24 +184,17 @@ class Enemy {
 
     shoot(target) {
         const dir = target.sub(this.pos).normalize();
-
         if (this.type === 'sentinel') {
-            // Rifles have faster bullets
-            const vel = dir.mult(8);
-            game.projectiles.push(new Projectile(this.pos, vel, '#ffae00'));
+            game.projectiles.push(new Projectile(this.pos, dir.mult(8), '#ffae00'));
         } else if (this.type === 'sniper') {
-            // Snipers have extremely fast projectiles
-            const vel = dir.mult(15);
-            game.projectiles.push(new Projectile(this.pos, vel, '#00ff88'));
+            game.projectiles.push(new Projectile(this.pos, dir.mult(22), '#00ff88'));
         } else {
-            const vel = dir.mult(5);
-            game.projectiles.push(new Projectile(this.pos, vel));
+            game.projectiles.push(new Projectile(this.pos, dir.mult(5)));
         }
     }
 
     draw(ctx) {
         ctx.shadowBlur = 15;
-
         if (this.type === 'fixed') {
             ctx.fillStyle = '#ff0055';
             ctx.shadowColor = '#ff0055';
@@ -234,8 +221,6 @@ class Enemy {
             ctx.beginPath();
             ctx.arc(this.pos.x, this.pos.y, 18, 0, Math.PI * 2);
             ctx.fill();
-
-            // Laser Warning Line
             if (this.chargeTimer > 0) {
                 const targetDir = game.player.pos.sub(this.pos).normalize();
                 ctx.setLineDash([2, 5]);
@@ -251,27 +236,57 @@ class Enemy {
     }
 }
 
+class Key {
+    constructor(x, y) {
+        this.pos = new Vector(x, y);
+        this.radius = 10;
+        this.collected = false;
+        this.angle = 0;
+    }
+    update() {
+        this.angle += 0.05;
+        if (!this.collected && this.pos.dist(game.player.pos) < 30) {
+            this.collected = true;
+            game.onKeyCollected();
+        }
+    }
+    draw(ctx) {
+        if (this.collected) return;
+        ctx.save();
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.rotate(this.angle);
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#fff100';
+        ctx.fillStyle = '#fff100';
+        ctx.fillRect(-8, -8, 16, 16);
+        ctx.strokeStyle = '#fff';
+        ctx.strokeRect(-8, -8, 16, 16);
+        ctx.restore();
+    }
+}
+
 class ChronosEngine {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         this.resize();
-
         this.player = new Player();
         this.enemies = [];
         this.projectiles = [];
         this.walls = [];
         this.particles = [];
+        this.keys = [];
+        this.keysRequired = 0;
+        this.keysFound = 0;
         this.exit = null;
-
         this.level = 1;
-        this.maxLevels = 10;
+        this.maxLevels = 15;
         this.globalTimeFactor = 0.05;
-        this.keys = {};
+        this.inputKeys = {};
         this.running = false;
 
-        window.addEventListener('keydown', e => this.keys[e.key] = true);
-        window.addEventListener('keyup', e => this.keys[e.key] = false);
+        window.addEventListener('keydown', e => this.inputKeys[e.key] = true);
+        window.addEventListener('keyup', e => this.inputKeys[e.key] = false);
         window.addEventListener('resize', () => this.resize());
     }
 
@@ -285,91 +300,149 @@ class ChronosEngine {
         this.projectiles = [];
         this.walls = [];
         this.particles = [];
+        this.keys = [];
+        this.keysFound = 0;
+        this.keysRequired = 0;
+        this.player.energy = 100; // Reset Energy
 
         const centerX = this.canvas.width / 2;
         const centerY = this.canvas.height / 2;
         this.player.pos = new Vector(80, centerY);
         this.exit = new Vector(this.canvas.width - 80, centerY);
 
+        const keyDisplay = document.getElementById('key-display');
+        keyDisplay.classList.add('hidden');
+        keyDisplay.classList.remove('complete');
+
         switch (n) {
-            case 1: // Tutorial: Basics
+            case 1:
                 this.walls.push({ x: centerX, y: centerY - 100, w: 20, h: 200 });
                 this.enemies.push(new Enemy(centerX + 200, centerY, 'fixed'));
                 break;
-            case 2: // Tutorial: Movement
+            case 2:
                 this.walls.push({ x: 300, y: 0, w: 20, h: centerY - 50 });
                 this.walls.push({ x: 300, y: centerY + 50, w: 20, h: centerY });
                 this.enemies.push(new Enemy(500, centerY - 100, 'fixed'));
                 this.enemies.push(new Enemy(500, centerY + 100, 'fixed'));
                 break;
-            case 3: // Intro Drones
+            case 3:
                 this.enemies.push(new Enemy(centerX, centerY - 150, 'drone'));
                 this.enemies.push(new Enemy(centerX, centerY + 150, 'drone'));
                 this.walls.push({ x: centerX - 100, y: centerY - 20, w: 200, h: 40 });
                 break;
-            case 4: // Intro Sentinel (Rapid)
+            case 4:
                 this.enemies.push(new Enemy(centerX + 100, centerY, 'sentinel'));
                 this.walls.push({ x: centerX - 50, y: 100, w: 20, h: 200 });
                 this.walls.push({ x: centerX - 50, y: centerY + 100, w: 20, h: 200 });
                 break;
-            case 5: // Intro Sniper (Laser)
+            case 5:
                 this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'sniper'));
                 this.walls.push({ x: centerX, y: centerY - 50, w: 40, h: 100 });
                 break;
-            case 6: // The Maze
+            case 6:
                 for (let i = 0; i < 5; i++) {
                     this.walls.push({ x: 200 + i * 150, y: i % 2 ? 0 : 300, w: 30, h: 400 });
                     this.enemies.push(new Enemy(200 + i * 150 + 60, centerY, 'drone'));
                 }
                 break;
-            case 7: // High Security
+            case 7:
                 this.enemies.push(new Enemy(centerX, 150, 'sniper'));
                 this.enemies.push(new Enemy(centerX, this.canvas.height - 150, 'sniper'));
                 this.enemies.push(new Enemy(centerX + 150, centerY, 'sentinel'));
                 this.walls.push({ x: centerX - 100, y: centerY - 100, w: 200, h: 20 });
                 this.walls.push({ x: centerX - 100, y: centerY + 100, w: 200, h: 20 });
                 break;
-            case 8: // Corridor of Death
+            case 8:
                 for (let i = 0; i < 4; i++) {
                     this.enemies.push(new Enemy(200 + i * 200, 100, 'sentinel'));
                     this.enemies.push(new Enemy(200 + i * 200, this.canvas.height - 100, 'sentinel'));
                 }
                 this.walls.push({ x: 150, y: centerY - 10, w: this.canvas.width - 300, h: 20 });
                 break;
-            case 9: // Sniper Valley
+            case 9:
                 for (let i = 0; i < 3; i++) {
                     this.enemies.push(new Enemy(centerX + (i * 100), 50 + (i * 200), 'sniper'));
                     this.walls.push({ x: centerX - 150 + (i * 100), y: 150 + (i * 200), w: 100, h: 20 });
                 }
                 break;
-            case 10: // BOSS RUN: THE ARCHITECT'S WRATH
-                // Maximum difficulty: All types combined
+            case 10:
                 this.enemies.push(new Enemy(centerX, centerY - 250, 'sniper'));
                 this.enemies.push(new Enemy(centerX, centerY + 250, 'sniper'));
                 this.enemies.push(new Enemy(centerX - 250, centerY, 'sentinel'));
                 this.enemies.push(new Enemy(centerX + 250, centerY, 'sentinel'));
                 this.enemies.push(new Enemy(centerX, centerY, 'fixed'));
-
                 for (let i = 0; i < 12; i++) {
                     const ang = (i / 12) * Math.PI * 2;
-                    const wx = centerX + Math.cos(ang) * 150;
-                    const wy = centerY + Math.sin(ang) * 150;
-                    this.walls.push({ x: wx - 20, y: wy - 20, w: 40, h: 40 });
+                    this.walls.push({ x: centerX + Math.cos(ang) * 150 - 20, y: centerY + Math.sin(ang) * 150 - 20, w: 40, h: 40 });
                 }
-                // Moving Drones inside the ring
                 this.enemies.push(new Enemy(centerX - 50, centerY - 50, 'drone'));
                 this.enemies.push(new Enemy(centerX + 50, centerY + 50, 'drone'));
                 break;
+            case 11:
+                this.keysRequired = 1;
+                this.keys.push(new Key(centerX, 100));
+                this.enemies.push(new Enemy(centerX, centerY, 'sentinel'));
+                this.walls.push({ x: centerX - 50, y: centerY - 50, w: 100, h: 100 });
+                break;
+            case 12:
+                this.keysRequired = 2;
+                this.keys.push(new Key(100, 100));
+                this.keys.push(new Key(100, this.canvas.height - 100));
+                this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'drone'));
+                this.walls.push({ x: centerX, y: 0, w: 20, h: this.canvas.height });
+                break;
+            case 13:
+                this.keysRequired = 3;
+                this.keys.push(new Key(centerX, 150));
+                this.keys.push(new Key(centerX, centerY));
+                this.keys.push(new Key(centerX, this.canvas.height - 150));
+                for (let i = 0; i < 3; i++) this.enemies.push(new Enemy(this.canvas.width - 250, 150 + i * 200, 'sniper'));
+                break;
+            case 14:
+                this.keysRequired = 2;
+                this.keys.push(new Key(centerX - 50, centerY - 200));
+                this.keys.push(new Key(centerX - 50, centerY + 200));
+                this.enemies.push(new Enemy(200, centerY, 'sentinel'));
+                this.enemies.push(new Enemy(this.canvas.width - 400, centerY, 'sentinel'));
+                break;
+            case 15:
+                this.keysRequired = 4;
+                this.keys.push(new Key(200, 200));
+                this.keys.push(new Key(this.canvas.width - 200, 200));
+                this.keys.push(new Key(200, this.canvas.height - 200));
+                this.keys.push(new Key(this.canvas.width - 200, this.canvas.height - 200));
+                this.enemies.push(new Enemy(centerX, centerY, 'sniper'));
+                this.enemies.push(new Enemy(centerX, 100, 'sentinel'));
+                this.enemies.push(new Enemy(centerX, this.canvas.height - 100, 'sentinel'));
+                break;
         }
 
+        if (this.keysRequired > 0) {
+            keyDisplay.classList.remove('hidden');
+            this.updateKeyUI();
+        }
         document.getElementById('level-display').innerText = n.toString().padStart(2, '0');
     }
 
-    checkCollision(pos, radius) {
-        // Bounds
-        if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return true;
+    onKeyCollected() {
+        this.keysFound++;
+        this.updateKeyUI();
+        this.createParticles(this.player.pos, '#fff100', 30);
+    }
 
-        // Walls
+    updateKeyUI() {
+        const el = document.getElementById('key-display');
+        if (this.keysFound >= this.keysRequired) {
+            el.innerText = "Chaves coletadas!";
+            el.classList.add('complete');
+        } else {
+            el.innerText = `Chaves coletadas: ${this.keysFound}/${this.keysRequired}`;
+            el.classList.remove('complete');
+        }
+    }
+
+    checkCollision(pos, radius) {
+        if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return true;
         for (let wall of this.walls) {
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
@@ -423,31 +496,27 @@ class ChronosEngine {
 
     update() {
         if (!this.running) return;
-
-        // Mechanics: TimeScale logic
         this.globalTimeFactor = this.player.isMoving ? 1.0 : 0.05;
-
-        // UI Updates
-        document.getElementById('energy-fill').style.width = this.player.energy + '%';
+        const energyFill = document.getElementById('energy-fill');
+        energyFill.style.width = this.player.energy + '%';
+        if (this.player.energy < 30) {
+            energyFill.classList.add('low-energy');
+        } else {
+            energyFill.classList.remove('low-energy');
+        }
         document.getElementById('time-state').innerText = this.player.isMoving ? 'TEMPO REAL' : 'SLOW MOTION';
         document.getElementById('time-overlay').className = this.player.isMoving ? '' : 'slow-mo';
-
-        this.player.update(this.keys, this.canvas);
-
+        this.player.update(this.inputKeys, this.canvas);
         this.enemies.forEach(e => e.update(this.globalTimeFactor, this.player.pos));
-
+        this.keys.forEach(k => k.update());
         this.projectiles.forEach(p => p.update(this.globalTimeFactor));
         this.projectiles = this.projectiles.filter(p => p.active);
-
-        // Particle update
         this.particles.forEach(p => {
             p.pos = p.pos.add(p.vel);
             p.life -= 0.02;
         });
         this.particles = this.particles.filter(p => p.life > 0);
-
-        // Check Exit
-        if (this.player.pos.dist(this.exit) < 30) {
+        if (this.player.pos.dist(this.exit) < 30 && this.keysFound >= this.keysRequired) {
             this.running = false;
             document.getElementById('clear-screen').classList.remove('hidden');
         }
@@ -455,8 +524,6 @@ class ChronosEngine {
 
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Draw Walls
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.shadowBlur = 5;
         this.ctx.shadowColor = '#000';
@@ -465,27 +532,22 @@ class ChronosEngine {
             this.ctx.strokeStyle = '#333';
             this.ctx.strokeRect(w.x, w.y, w.w, w.h);
         });
-
-        // Draw Exit
-        this.ctx.strokeStyle = '#00ff88';
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeStyle = (this.keysFound >= this.keysRequired) ? '#00ff88' : '#333';
         this.ctx.beginPath();
         this.ctx.arc(this.exit.x, this.exit.y, 30, 0, Math.PI * 2);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
-
         this.projectiles.forEach(p => p.draw(this.ctx, this.globalTimeFactor));
         this.enemies.forEach(e => e.draw(this.ctx));
-
-        // Draw Particles
+        this.keys.forEach(k => k.draw(this.ctx));
         this.particles.forEach(p => {
             this.ctx.globalAlpha = p.life;
             this.ctx.fillStyle = p.color;
             this.ctx.fillRect(p.pos.x, p.pos.y, 3, 3);
         });
         this.ctx.globalAlpha = 1.0;
-
         this.player.draw(this.ctx);
     }
 

@@ -100,8 +100,18 @@ canvas {
     height: 100%;
     width: 100%;
     background: linear-gradient(90deg, var(--energy-color), #00ffea);
-    transition: width 0.1s ease-out;
+    transition: width 0.1s ease-out, background 0.3s ease;
     box-shadow: 0 0 10px var(--energy-color);
+}
+
+#energy-fill.low-energy {
+    background: linear-gradient(90deg, #ff0000, #ff4d00) !important;
+    box-shadow: 0 0 10px #ff0000;
+}
+
+#key-display.complete {
+    color: #00ff88;
+    text-shadow: 1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000;
 }
 
 /* Level Start / Game Over Overlays */
