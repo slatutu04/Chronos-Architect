@@ -428,7 +428,10 @@ class ChronosEngine {
 
         if (this.keysRequired > 0) {
             keyDisplay.classList.remove('hidden');
+            document.getElementById('hud').classList.add('hud-shifted');
             this.updateKeyUI();
+        } else {
+            document.getElementById('hud').classList.remove('hud-shifted');
         }
         document.getElementById('level-display').innerText = n.toString().padStart(2, '0');
     }
