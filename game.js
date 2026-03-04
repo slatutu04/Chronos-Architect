@@ -30,6 +30,7 @@ class Player {
         this.isMoving = false;
         this.dashCooldown = 0;
         this.trail = [];
+        this.ghosts = []; // For "After-image" effect
     }
 
     update(keys, canvas, dt) {
@@ -54,6 +55,9 @@ class Player {
         this.trail.forEach(t => t.life -= 0.05 * dt);
         this.trail = this.trail.filter(t => t.life > 0);
 
+        this.ghosts.forEach(g => g.life -= 0.04 * dt);
+        this.ghosts = this.ghosts.filter(g => g.life > 0);
+
         // Apply movement
         const nextPos = this.pos.add(this.vel.mult(dt));
         if (!game.checkCollision(nextPos, this.radius)) {
@@ -71,15 +75,20 @@ class Player {
         const dashDir = this.vel.mag() > 0 ? this.vel.normalize() : new Vector(1, 0);
         const dashDist = 120;
 
-        // Simple raycast for dash collision
-        let step = dashDir.mult(2); // Smaller steps for smoother dash trail
+        // High frequency points during dash
+        let step = dashDir.mult(10); // Better spacing
         let current = this.pos;
-        const totalSteps = Math.floor(dashDist / 2);
+        const totalSteps = Math.floor(dashDist / 10);
         for (let i = 0; i < totalSteps; i++) {
             let next = current.add(step);
             if (game.checkCollision(next, this.radius)) break;
             current = next;
-            this.trail.push({ x: current.x, y: current.y, life: 1.5 });
+            this.trail.push({ x: current.x, y: current.y, life: 1.2 });
+
+            // Add ghost images at intervals
+            if (i % 3 === 0) {
+                this.ghosts.push({ x: current.x, y: current.y, life: 0.8 });
+            }
         }
 
         this.pos = current;
@@ -90,19 +99,40 @@ class Player {
     }
 
     draw(ctx) {
-        if (this.trail.length > 1) {
+        if (this.trail.length > 2) {
             ctx.save();
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#00f2ff';
             ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // Pass 1: Wide Neon Glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00f2ff';
             for (let i = 1; i < this.trail.length; i++) {
                 const t1 = this.trail[i - 1];
                 const t2 = this.trail[i];
                 const dist = Math.sqrt((t1.x - t2.x) ** 2 + (t1.y - t2.y) ** 2);
+
                 if (dist < 100) {
                     ctx.beginPath();
-                    ctx.strokeStyle = `rgba(0, 242, 255, ${t2.life * 0.4})`;
-                    ctx.lineWidth = this.radius * 2 * t2.life;
+                    ctx.strokeStyle = `rgba(0, 242, 255, ${t2.life * 0.25})`;
+                    ctx.lineWidth = this.radius * 2.2 * t2.life;
+                    ctx.moveTo(t1.x, t1.y);
+                    ctx.lineTo(t2.x, t2.y);
+                    ctx.stroke();
+                }
+            }
+
+            // Pass 2: Sharp Inner Core
+            ctx.shadowBlur = 0;
+            for (let i = 1; i < this.trail.length; i++) {
+                const t1 = this.trail[i - 1];
+                const t2 = this.trail[i];
+                const dist = Math.sqrt((t1.x - t2.x) ** 2 + (t1.y - t2.y) ** 2);
+
+                if (dist < 100) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${t2.life * 0.6})`;
+                    ctx.lineWidth = this.radius * 0.8 * t2.life;
                     ctx.moveTo(t1.x, t1.y);
                     ctx.lineTo(t2.x, t2.y);
                     ctx.stroke();
@@ -110,6 +140,18 @@ class Player {
             }
             ctx.restore();
         }
+
+        // Draw Ghosts (After-images)
+        this.ghosts.forEach(g => {
+            ctx.save();
+            ctx.globalAlpha = g.life * 0.5;
+            ctx.strokeStyle = '#00f2ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(g.x, g.y, this.radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+        });
 
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#00f2ff';
