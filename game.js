@@ -72,9 +72,10 @@ class Player {
         const dashDist = 120;
 
         // Simple raycast for dash collision
-        let step = dashDir.mult(5);
+        let step = dashDir.mult(2); // Smaller steps for smoother dash trail
         let current = this.pos;
-        for (let i = 0; i < dashDist / 5; i++) {
+        const totalSteps = Math.floor(dashDist / 2);
+        for (let i = 0; i < totalSteps; i++) {
             let next = current.add(step);
             if (game.checkCollision(next, this.radius)) break;
             current = next;
@@ -89,15 +90,26 @@ class Player {
     }
 
     draw(ctx) {
-        ctx.save();
-        this.trail.forEach(t => {
-            ctx.globalAlpha = t.life * 0.3;
-            ctx.fillStyle = '#00f2ff';
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, this.radius * t.life, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.restore();
+        if (this.trail.length > 1) {
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00f2ff';
+            ctx.lineCap = 'round';
+            for (let i = 1; i < this.trail.length; i++) {
+                const t1 = this.trail[i - 1];
+                const t2 = this.trail[i];
+                const dist = Math.sqrt((t1.x - t2.x) ** 2 + (t1.y - t2.y) ** 2);
+                if (dist < 100) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = `rgba(0, 242, 255, ${t2.life * 0.4})`;
+                    ctx.lineWidth = this.radius * 2 * t2.life;
+                    ctx.moveTo(t1.x, t1.y);
+                    ctx.lineTo(t2.x, t2.y);
+                    ctx.stroke();
+                }
+            }
+            ctx.restore();
+        }
 
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#00f2ff';
@@ -343,20 +355,25 @@ class ChronosEngine {
     }
 
     resize() {
+        // Use a safety margin (padding) to avoid taskbar overlap
+        const padding = 40;
+        const availableWidth = window.innerWidth - padding;
+        const availableHeight = window.innerHeight - padding;
+
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        const screenRatio = this.canvas.width / this.canvas.height;
+        const screenRatio = availableWidth / availableHeight;
         const gameRatio = this.width / this.height;
 
         if (screenRatio > gameRatio) {
-            this.scale = this.canvas.height / this.height;
+            this.scale = availableHeight / this.height;
             this.offsetX = (this.canvas.width - this.width * this.scale) / 2;
-            this.offsetY = 0;
-        } else {
-            this.scale = this.canvas.width / this.width;
             this.offsetY = (this.canvas.height - this.height * this.scale) / 2;
-            this.offsetX = 0;
+        } else {
+            this.scale = availableWidth / this.width;
+            this.offsetY = (this.canvas.height - this.height * this.scale) / 2;
+            this.offsetX = (this.canvas.width - this.width * this.scale) / 2;
         }
     }
 
