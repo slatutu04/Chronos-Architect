@@ -379,11 +379,19 @@ class ChronosEngine {
         this.bgParticles = [];
         this.initBgParticles();
 
-        // Time Stop Stats
-        this.timestopEnergy = 100;
-        this.isTimestopped = false;
-        this.timestopUses = 2;
         this.timestopUnlocked = false;
+
+        // Camera and Large World Support
+        this.cameraX = 0;
+        this.cameraY = 0;
+        this.worldWidth = 1600;
+        this.worldHeight = 900;
+
+        // Intro Cutscene State
+        this.isLevelIntro = false;
+        this.introText = "";
+        this.introTimer = 0;
+        this.introTextProgress = 0;
 
         window.addEventListener('keydown', e => {
             this.inputKeys[e.key] = true;
@@ -435,6 +443,32 @@ class ChronosEngine {
         this.screenShake = intensity;
     }
 
+    // Radar logic for Phase 20
+    drawRadar(ctx) {
+        if (this.level !== 20) return;
+
+        ctx.save();
+        ctx.translate(this.width - 200, this.height - 200);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(0, 0, 180, 180);
+        ctx.strokeStyle = '#00f2ff';
+        ctx.strokeRect(0, 0, 180, 180);
+
+        const radarScale = 180 / this.worldWidth;
+
+        // Draw Player on radar
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(this.player.pos.x * radarScale - 2, this.player.pos.y * radarScale - 2, 4, 4);
+
+        // Draw Keys on radar
+        ctx.fillStyle = '#fff100';
+        this.keys.forEach(k => {
+            ctx.fillRect(k.pos.x * radarScale - 2, k.pos.y * radarScale - 2, 4, 4);
+        });
+
+        ctx.restore();
+    }
+
     initLevel(n) {
         this.enemies = [];
         this.projectiles = [];
@@ -444,6 +478,8 @@ class ChronosEngine {
         this.keysFound = 0;
         this.keysRequired = 0;
         this.player.energy = 100; // Reset Energy
+        this.bgParticles = [];
+        this.initBgParticles();
 
         const centerX = this.width / 2;
         const centerY = this.height / 2;
@@ -598,16 +634,64 @@ class ChronosEngine {
                     this.enemies.push(new Enemy(centerX + Math.cos(ang) * 300, centerY + Math.sin(ang) * 300, 'sniper'));
                 }
                 break;
-            case 20: // FINAL BOSS: THE TIME ENGINE
-                this.keysRequired = 1;
-                this.keys.push(new Key(centerX, centerY));
-                for (let i = 0; i < 10; i++) {
-                    this.enemies.push(new Enemy(Math.random() * this.width, Math.random() * this.height, 'sentinel'));
+            case 20:
+                this.worldWidth = 5000;
+                this.worldHeight = 5000;
+                this.keysRequired = 5;
+                this.isLevelIntro = true;
+                this.introText = "PROTOCOLO FINAL: O ARQUITETO DE CHRONOS. RECONSTRUA O NÚCLEO COLETANDO AS 5 ÂNCORAS TEMPORAIS.";
+                this.introTimer = 0;
+                this.introTextProgress = 0;
+
+                // Portal at center
+                this.exit = new Vector(2500, 2500);
+                this.player.pos = new Vector(2500, 2550); // Start near portal
+
+                // Create a massive maze logic
+                // Using a regular grid of corridors with random blocks
+                for (let i = 1; i < 20; i++) {
+                    for (let j = 1; j < 20; j++) {
+                        const wx = i * 250;
+                        const wy = j * 250;
+                        if (Math.random() > 0.4) {
+                            const isVert = Math.random() > 0.5;
+                            this.walls.push({
+                                x: wx, y: wy,
+                                w: isVert ? 20 : 250,
+                                h: isVert ? 250 : 20
+                            });
+                        }
+                    }
                 }
-                for (let i = 0; i < 4; i++) {
-                    this.enemies.push(new Enemy(i * 300 + 100, 100, 'sniper'));
-                    this.enemies.push(new Enemy(i * 300 + 100, this.height - 100, 'sniper'));
+
+                // Clear center area around portal
+                this.walls = this.walls.filter(w => new Vector(w.x, w.y).dist(this.exit) > 400);
+
+                // Place 5 Keys in corners/edges
+                const keyPos = [
+                    new Vector(400, 400), new Vector(4600, 400),
+                    new Vector(400, 4600), new Vector(4600, 4600),
+                    new Vector(1000, 2500)
+                ];
+                keyPos.forEach(p => {
+                    this.keys.push(new Key(p.x, p.y));
+                    // Boss Guardian for each key
+                    this.enemies.push(new Enemy(p.x + 40, p.y + 40, 'sniper'));
+                    this.enemies.push(new Enemy(p.x - 40, p.y - 40, 'sentinel'));
+                });
+
+                // Scatter many normal snipers
+                for (let i = 0; i < 40; i++) {
+                    const sx = Math.random() * (this.worldWidth - 600) + 300;
+                    const sy = Math.random() * (this.worldHeight - 600) + 300;
+                    if (new Vector(sx, sy).dist(this.player.pos) > 600) {
+                        this.enemies.push(new Enemy(sx, sy, 'sniper'));
+                    }
                 }
+                break;
+            default:
+                this.worldWidth = 1600;
+                this.worldHeight = 900;
                 break;
         }
 
@@ -889,12 +973,29 @@ class ChronosEngine {
     update(dt) {
         if (!this.running || this.isPaused) return;
 
+        if (this.isLevelIntro) {
+            this.introTimer += dt;
+            if (this.introTimer > 1) {
+                this.introTextProgress += 0.5 * dt;
+                if (this.introTextProgress > this.introText.length + 60) {
+                    this.isLevelIntro = false;
+                }
+            }
+            return;
+        }
+
+        // Camera Logic (Follow Player)
+        this.cameraX = this.player.pos.x - 800; // Center (1600/2)
+        this.cameraY = this.player.pos.y - 450; // Center (900/2)
+        this.cameraX = Math.max(0, Math.min(this.cameraX, this.worldWidth - 1600));
+        this.cameraY = Math.max(0, Math.min(this.cameraY, this.worldHeight - 900));
+
         // Background Particles
         const ts = this.isTimestopped ? 0 : this.globalTimeFactor;
         this.bgParticles.forEach(p => {
             p.y += p.z * 0.5 * ts * dt;
-            if (p.y > this.height) p.y = 0;
-            if (p.y < 0) p.y = this.height;
+            if (p.y > this.worldHeight) p.y = 0;
+            if (p.y < 0) p.y = this.worldHeight;
         });
 
         if (this.screenShake > 0) this.screenShake -= 0.5 * dt;
@@ -970,20 +1071,21 @@ class ChronosEngine {
 
         this.ctx.save();
 
-        // Apply Screen Shake
+        let sx = 0, sy = 0;
         if (this.screenShake > 0) {
-            const sx = (Math.random() - 0.5) * this.screenShake;
-            const sy = (Math.random() - 0.5) * this.screenShake;
-            this.ctx.translate(this.offsetX + sx, this.offsetY + sy);
-        } else {
-            this.ctx.translate(this.offsetX, this.offsetY);
+            sx = (Math.random() - 0.5) * this.screenShake;
+            sy = (Math.random() - 0.5) * this.screenShake;
         }
 
+        this.ctx.translate(this.offsetX + sx, this.offsetY + sy);
         this.ctx.scale(this.scale, this.scale);
 
-        // Draw game boundary for visual feedback
+        // Apply Camera Offset
+        this.ctx.translate(-this.cameraX, -this.cameraY);
+
+        // Draw game boundary
         this.ctx.fillStyle = '#0a0a0a';
-        this.ctx.fillRect(0, 0, this.width, this.height);
+        this.ctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
 
         // Draw Background Particles
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
@@ -1003,6 +1105,7 @@ class ChronosEngine {
             this.ctx.strokeStyle = '#333';
             this.ctx.strokeRect(w.x, w.y, w.w, w.h);
         });
+
         this.ctx.lineWidth = 3;
         this.ctx.setLineDash([5, 5]);
         this.ctx.strokeStyle = (this.keysFound >= this.keysRequired) ? '#00ff88' : '#333';
@@ -1010,6 +1113,7 @@ class ChronosEngine {
         this.ctx.arc(this.exit.x, this.exit.y, 30, 0, Math.PI * 2);
         this.ctx.stroke();
         this.ctx.setLineDash([]);
+
         this.projectiles.forEach(p => p.draw(this.ctx, this.globalTimeFactor));
         this.enemies.forEach(e => e.draw(this.ctx));
         this.keys.forEach(k => k.draw(this.ctx));
@@ -1021,7 +1125,37 @@ class ChronosEngine {
         this.ctx.globalAlpha = 1.0;
         this.player.draw(this.ctx);
 
+        // Temporal Fog
+        if (this.level === 20 && !this.isLevelIntro) {
+            this.ctx.save();
+            this.ctx.translate(this.cameraX, this.cameraY);
+            const fogGrad = this.ctx.createRadialGradient(
+                this.player.pos.x - this.cameraX, this.player.pos.y - this.cameraY, 200,
+                this.player.pos.x - this.cameraX, this.player.pos.y - this.cameraY, 600
+            );
+            fogGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            fogGrad.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
+            this.ctx.fillStyle = fogGrad;
+            this.ctx.fillRect(0, 0, 1600, 900);
+            this.ctx.restore();
+        }
+
         this.ctx.restore();
+
+        // UI
+        this.drawRadar(this.ctx);
+
+        if (this.isLevelIntro) {
+            this.ctx.save();
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = '24px "Outfit"';
+            this.ctx.textAlign = 'center';
+            const text = this.introText.substring(0, Math.floor(this.introTextProgress));
+            this.ctx.fillText(text, this.canvas.width / 2, this.canvas.height / 2);
+            this.ctx.restore();
+        }
     }
     loop(timestamp) {
         if (!this.running) {
