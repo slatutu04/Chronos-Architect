@@ -29,9 +29,10 @@ class Player {
         this.maxEnergy = 100;
         this.isMoving = false;
         this.dashCooldown = 0;
+        this.trail = [];
     }
 
-    update(keys, canvas) {
+    update(keys, canvas, dt) {
         this.vel = new Vector(0, 0);
         if (keys['w'] || keys['ArrowUp']) this.vel.y = -1;
         if (keys['s'] || keys['ArrowDown']) this.vel.y = 1;
@@ -42,14 +43,19 @@ class Player {
             this.vel = this.vel.normalize().mult(this.speed);
             this.isMoving = true;
             // Recharge energy only when moving (Real Time), and recharge faster
-            this.energy = Math.min(this.maxEnergy, this.energy + 0.45); // Slightly faster (was 0.15)
+            this.energy = Math.min(this.maxEnergy, this.energy + 0.45 * dt); // Slightly faster (was 0.15)
+
+            this.trail.push({ x: this.pos.x, y: this.pos.y, life: 1.0 });
         } else {
             this.isMoving = false;
             // No energy recharge while stopped
         }
 
+        this.trail.forEach(t => t.life -= 0.05 * dt);
+        this.trail = this.trail.filter(t => t.life > 0);
+
         // Apply movement
-        const nextPos = this.pos.add(this.vel);
+        const nextPos = this.pos.add(this.vel.mult(dt));
         if (!game.checkCollision(nextPos, this.radius)) {
             this.pos = nextPos;
         }
@@ -58,7 +64,7 @@ class Player {
             this.dash();
         }
 
-        if (this.dashCooldown > 0) this.dashCooldown--;
+        if (this.dashCooldown > 0) this.dashCooldown -= dt;
     }
 
     dash() {
@@ -72,15 +78,27 @@ class Player {
             let next = current.add(step);
             if (game.checkCollision(next, this.radius)) break;
             current = next;
+            this.trail.push({ x: current.x, y: current.y, life: 1.5 });
         }
 
         this.pos = current;
         this.energy -= 30;
         this.dashCooldown = 20;
         game.createParticles(this.pos, '#00f2ff', 20);
+        game.shake(10);
     }
 
     draw(ctx) {
+        ctx.save();
+        this.trail.forEach(t => {
+            ctx.globalAlpha = t.life * 0.3;
+            ctx.fillStyle = '#00f2ff';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, this.radius * t.life, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
+
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#00f2ff';
         ctx.fillStyle = '#fff';
@@ -250,8 +268,8 @@ class Key {
         this.collected = false;
         this.angle = 0;
     }
-    update() {
-        this.angle += 0.05;
+    update(dt) {
+        this.angle += 0.05 * dt;
         if (!this.collected && this.pos.dist(game.player.pos) < 30) {
             this.collected = true;
             game.onKeyCollected();
@@ -293,8 +311,19 @@ class ChronosEngine {
         this.running = false;
         this.isPaused = false;
         this.loopInitiated = false; // Add guard for single loop
+        this.width = 1600;
+        this.height = 900;
+        this.scale = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+
         this.returningScreen = 'start-screen';
         this.selectedLevel = 1; // Track selection in menu
+
+        // Visual Effects
+        this.screenShake = 0;
+        this.bgParticles = [];
+        this.initBgParticles();
 
         // Time Stop Stats
         this.timestopEnergy = 100;
@@ -316,6 +345,35 @@ class ChronosEngine {
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
+
+        const screenRatio = this.canvas.width / this.canvas.height;
+        const gameRatio = this.width / this.height;
+
+        if (screenRatio > gameRatio) {
+            this.scale = this.canvas.height / this.height;
+            this.offsetX = (this.canvas.width - this.width * this.scale) / 2;
+            this.offsetY = 0;
+        } else {
+            this.scale = this.canvas.width / this.width;
+            this.offsetY = (this.canvas.height - this.height * this.scale) / 2;
+            this.offsetX = 0;
+        }
+    }
+
+    initBgParticles() {
+        for (let i = 0; i < 150; i++) {
+            this.bgParticles.push({
+                x: Math.random() * this.width,
+                y: Math.random() * this.height,
+                z: Math.random() * 2 + 1,
+                size: Math.random() * 2 + 1,
+                alpha: Math.random() * 0.5 + 0.1
+            });
+        }
+    }
+
+    shake(intensity) {
+        this.screenShake = intensity;
     }
 
     initLevel(n) {
@@ -328,10 +386,10 @@ class ChronosEngine {
         this.keysRequired = 0;
         this.player.energy = 100; // Reset Energy
 
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        const centerX = this.width / 2;
+        const centerY = this.height / 2;
         this.player.pos = new Vector(80, centerY);
-        this.exit = new Vector(this.canvas.width - 80, centerY);
+        this.exit = new Vector(this.width - 80, centerY);
 
         const keyDisplay = document.getElementById('key-display');
         keyDisplay.classList.add('hidden');
@@ -359,18 +417,19 @@ class ChronosEngine {
                 this.walls.push({ x: centerX - 50, y: centerY + 100, w: 20, h: 200 });
                 break;
             case 5:
-                this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'sniper'));
+                this.enemies.push(new Enemy(this.width - 200, centerY, 'sniper'));
                 this.walls.push({ x: centerX, y: centerY - 50, w: 40, h: 100 });
                 break;
             case 6:
                 for (let i = 0; i < 5; i++) {
-                    this.walls.push({ x: 200 + i * 150, y: i % 2 ? 0 : 300, w: 30, h: 400 });
+                    const h = i % 2 ? 400 : this.height - 300;
+                    this.walls.push({ x: 200 + i * 150, y: i % 2 ? 0 : 300, w: 30, h: h });
                     this.enemies.push(new Enemy(200 + i * 150 + 60, centerY, 'drone'));
                 }
                 break;
             case 7:
                 this.enemies.push(new Enemy(centerX, 150, 'sniper'));
-                this.enemies.push(new Enemy(centerX, this.canvas.height - 150, 'sniper'));
+                this.enemies.push(new Enemy(centerX, this.height - 150, 'sniper'));
                 this.enemies.push(new Enemy(centerX + 150, centerY, 'sentinel'));
                 this.walls.push({ x: centerX - 100, y: centerY - 100, w: 200, h: 20 });
                 this.walls.push({ x: centerX - 100, y: centerY + 100, w: 200, h: 20 });
@@ -378,9 +437,9 @@ class ChronosEngine {
             case 8:
                 for (let i = 0; i < 4; i++) {
                     this.enemies.push(new Enemy(200 + i * 200, 100, 'sentinel'));
-                    this.enemies.push(new Enemy(200 + i * 200, this.canvas.height - 100, 'sentinel'));
+                    this.enemies.push(new Enemy(200 + i * 200, this.height - 100, 'sentinel'));
                 }
-                this.walls.push({ x: 150, y: centerY - 10, w: this.canvas.width - 300, h: 20 });
+                this.walls.push({ x: 150, y: centerY - 10, w: this.width - 300, h: 20 });
                 break;
             case 9:
                 for (let i = 0; i < 3; i++) {
@@ -410,8 +469,8 @@ class ChronosEngine {
             case 12:
                 this.keysRequired = 2;
                 this.keys.push(new Key(100, 100));
-                this.keys.push(new Key(100, this.canvas.height - 100));
-                this.enemies.push(new Enemy(this.canvas.width - 200, centerY, 'drone'));
+                this.keys.push(new Key(100, this.height - 100));
+                this.enemies.push(new Enemy(this.width - 200, centerY, 'drone'));
                 // Fixed wall: added passage in the middle
                 this.walls.push({ x: centerX, y: 0, w: 20, h: centerY - 100 });
                 this.walls.push({ x: centerX, y: centerY + 100, w: 20, h: centerY });
@@ -420,25 +479,25 @@ class ChronosEngine {
                 this.keysRequired = 3;
                 this.keys.push(new Key(centerX, 150));
                 this.keys.push(new Key(centerX, centerY));
-                this.keys.push(new Key(centerX, this.canvas.height - 150));
-                for (let i = 0; i < 3; i++) this.enemies.push(new Enemy(this.canvas.width - 250, 150 + i * 200, 'sniper'));
+                this.keys.push(new Key(centerX, this.height - 150));
+                for (let i = 0; i < 3; i++) this.enemies.push(new Enemy(this.width - 250, 150 + i * 200, 'sniper'));
                 break;
             case 14:
                 this.keysRequired = 2;
                 this.keys.push(new Key(centerX - 50, centerY - 200));
                 this.keys.push(new Key(centerX - 50, centerY + 200));
                 this.enemies.push(new Enemy(200, centerY, 'sentinel'));
-                this.enemies.push(new Enemy(this.canvas.width - 400, centerY, 'sentinel'));
+                this.enemies.push(new Enemy(this.width - 400, centerY, 'sentinel'));
                 break;
             case 15:
                 this.keysRequired = 4;
                 this.keys.push(new Key(200, 200));
-                this.keys.push(new Key(this.canvas.width - 200, 200));
-                this.keys.push(new Key(200, this.canvas.height - 200));
-                this.keys.push(new Key(this.canvas.width - 200, this.canvas.height - 200));
+                this.keys.push(new Key(this.width - 200, 200));
+                this.keys.push(new Key(200, this.height - 200));
+                this.keys.push(new Key(this.width - 200, this.height - 200));
                 this.enemies.push(new Enemy(centerX, centerY, 'sniper'));
                 this.enemies.push(new Enemy(centerX, 100, 'sentinel'));
-                this.enemies.push(new Enemy(centerX, this.canvas.height - 100, 'sentinel'));
+                this.enemies.push(new Enemy(centerX, this.height - 100, 'sentinel'));
                 break;
 
             // CHALLENGE LEVELS (16-20) - TIME STOP MECHANIC
@@ -449,20 +508,23 @@ class ChronosEngine {
                 this.enemies.push(new Enemy(centerX + 200, centerY + 150, 'sentinel'));
                 // Wall with Gap in the middle (fixed "impossible" block)
                 this.walls.push({ x: centerX, y: 0, w: 20, h: centerY - 100 });
-                this.walls.push({ x: centerX, y: centerY + 100, w: 20, h: this.canvas.height - (centerY + 100) });
+                this.walls.push({ x: centerX, y: centerY + 100, w: 20, h: this.height - (centerY + 100) });
                 break;
             case 17:
                 this.keysRequired = 2;
                 this.keys.push(new Key(centerX, 100));
-                this.keys.push(new Key(centerX, this.canvas.height - 100));
+                this.keys.push(new Key(centerX, this.height - 100));
                 for (let i = 0; i < 4; i++) this.enemies.push(new Enemy(centerX + (i * 100), centerY + (i % 2 ? 50 : -50), 'sentinel'));
+                this.enemies.push(new Enemy(centerX - 120, 100, 'sniper'));
+                this.enemies.push(new Enemy(centerX + 120, this.height - 100, 'sniper'));
                 break;
             case 18: // THE GREAT MAZE
                 this.keysRequired = 3;
                 // Maze Walls
                 for (let i = 1; i < 6; i++) {
                     let wx = i * 200;
-                    this.walls.push({ x: wx, y: (i % 2 ? 0 : 300), w: 30, h: 450 });
+                    const h = i % 2 ? 450 : this.height - 300;
+                    this.walls.push({ x: wx, y: (i % 2 ? 0 : 300), w: 30, h: h });
                 }
                 this.keys.push(new Key(250, 100));
                 this.keys.push(new Key(650, 500));
@@ -481,11 +543,11 @@ class ChronosEngine {
                 this.keysRequired = 1;
                 this.keys.push(new Key(centerX, centerY));
                 for (let i = 0; i < 10; i++) {
-                    this.enemies.push(new Enemy(Math.random() * this.canvas.width, Math.random() * this.canvas.height, 'sentinel'));
+                    this.enemies.push(new Enemy(Math.random() * this.width, Math.random() * this.height, 'sentinel'));
                 }
                 for (let i = 0; i < 4; i++) {
                     this.enemies.push(new Enemy(i * 300 + 100, 100, 'sniper'));
-                    this.enemies.push(new Enemy(i * 300 + 100, this.canvas.height - 100, 'sniper'));
+                    this.enemies.push(new Enemy(i * 300 + 100, this.height - 100, 'sniper'));
                 }
                 break;
         }
@@ -521,9 +583,11 @@ class ChronosEngine {
                 this.isTimestopped = true;
                 this.timestopUses--;
                 this.createParticles(this.player.pos, '#fff100', 50);
+                this.shake(15);
             }
         } else {
             this.isTimestopped = false;
+            this.shake(5);
         }
         this.updateTimeStopUI();
     }
@@ -539,6 +603,7 @@ class ChronosEngine {
         this.keysFound++;
         this.updateKeyUI();
         this.createParticles(this.player.pos, '#fff100', 30);
+        this.shake(8);
     }
 
     updateKeyUI() {
@@ -553,7 +618,7 @@ class ChronosEngine {
     }
 
     checkCollision(pos, radius) {
-        if (pos.x < 0 || pos.x > this.canvas.width || pos.y < 0 || pos.y > this.canvas.height) return true;
+        if (pos.x < 0 || pos.x > this.width || pos.y < 0 || pos.y > this.height) return true;
         for (let wall of this.walls) {
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
@@ -683,6 +748,7 @@ class ChronosEngine {
 
     gameOver() {
         this.running = false;
+        this.shake(20);
         document.getElementById('death-screen').classList.remove('hidden');
     }
 
@@ -704,7 +770,7 @@ class ChronosEngine {
 
         this.level++;
         if (this.level > this.maxLevels) {
-            alert("MISÃO CUMPRIDA! VOCÊ DOMINOU O TEMPO.");
+            alert("MISSÃO CUMPRIDA! VOCÊ DOMINOU O TEMPO.");
             this.level = 1;
             this.timestopUnlocked = false;
         }
@@ -729,7 +795,11 @@ class ChronosEngine {
         this.level = 16;
         this.initLevel(this.level);
         this.running = true;
-        this.loop();
+
+        if (!this.loopInitiated) {
+            this.loopInitiated = true;
+            this.loop(performance.now());
+        }
     }
 
     togglePause() {
@@ -757,19 +827,29 @@ class ChronosEngine {
         document.getElementById('controls-screen').classList.remove('hidden');
     }
 
-    update() {
+    update(dt) {
         if (!this.running || this.isPaused) return;
+
+        // Background Particles
+        const ts = this.isTimestopped ? 0 : this.globalTimeFactor;
+        this.bgParticles.forEach(p => {
+            p.y += p.z * 0.5 * ts * dt;
+            if (p.y > this.height) p.y = 0;
+            if (p.y < 0) p.y = this.height;
+        });
+
+        if (this.screenShake > 0) this.screenShake -= 0.5 * dt;
 
         if (this.isTimestopped) {
             // TIME STOP MODES
             document.getElementById('time-overlay').className = 'timestop-active';
             document.getElementById('time-state').innerText = 'TIME STOP';
 
-            this.player.update(this.inputKeys, this.canvas);
+            this.player.update(this.inputKeys, this.canvas, dt);
 
             // Drain energy if moving
             if (this.player.isMoving) {
-                this.timestopEnergy -= 0.8;
+                this.timestopEnergy -= 0.8 * dt;
                 if (this.timestopEnergy <= 0) {
                     this.timestopEnergy = 0;
                     this.isTimestopped = false;
@@ -779,19 +859,20 @@ class ChronosEngine {
 
             // Particles and Key collection still work
             this.particles.forEach(p => {
-                p.pos = p.pos.add(p.vel);
-                p.life -= 0.02;
+                p.pos = p.pos.add(p.vel.mult(dt));
+                p.life -= 0.02 * dt;
             });
             this.particles = this.particles.filter(p => p.life > 0);
-            this.keys.forEach(k => k.update());
+            this.keys.forEach(k => k.update(dt));
 
         } else {
             // NORMAL MODES
             this.globalTimeFactor = this.player.isMoving ? 1.0 : 0.05;
+            const scaledTime = this.globalTimeFactor * dt;
 
             // Significantly faster recharge for Time Stop (was 0.02)
             if (this.level >= 16 && this.timestopEnergy < 100) {
-                this.timestopEnergy += 0.15;
+                this.timestopEnergy += 0.15 * dt;
                 this.updateTimeStopUI();
             }
 
@@ -806,15 +887,15 @@ class ChronosEngine {
             document.getElementById('time-state').innerText = this.player.isMoving ? 'TEMPO REAL' : 'SLOW MOTION';
             document.getElementById('time-overlay').className = this.player.isMoving ? '' : 'slow-mo';
 
-            this.player.update(this.inputKeys, this.canvas);
-            this.enemies.forEach(e => e.update(this.globalTimeFactor, this.player.pos));
-            this.keys.forEach(k => k.update());
-            this.projectiles.forEach(p => p.update(this.globalTimeFactor));
+            this.player.update(this.inputKeys, this.canvas, dt);
+            this.enemies.forEach(e => e.update(scaledTime, this.player.pos));
+            this.keys.forEach(k => k.update(dt));
+            this.projectiles.forEach(p => p.update(scaledTime));
             this.projectiles = this.projectiles.filter(p => p.active);
 
             this.particles.forEach(p => {
-                p.pos = p.pos.add(p.vel);
-                p.life -= 0.02;
+                p.pos = p.pos.add(p.vel.mult(dt));
+                p.life -= 0.02 * dt;
             });
             this.particles = this.particles.filter(p => p.life > 0);
         }
@@ -827,6 +908,34 @@ class ChronosEngine {
 
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.save();
+
+        // Apply Screen Shake
+        if (this.screenShake > 0) {
+            const sx = (Math.random() - 0.5) * this.screenShake;
+            const sy = (Math.random() - 0.5) * this.screenShake;
+            this.ctx.translate(this.offsetX + sx, this.offsetY + sy);
+        } else {
+            this.ctx.translate(this.offsetX, this.offsetY);
+        }
+
+        this.ctx.scale(this.scale, this.scale);
+
+        // Draw game boundary for visual feedback
+        this.ctx.fillStyle = '#0a0a0a';
+        this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // Draw Background Particles
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        this.bgParticles.forEach(p => {
+            this.ctx.globalAlpha = p.alpha;
+            this.ctx.beginPath();
+            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        this.ctx.globalAlpha = 1.0;
+
         this.ctx.fillStyle = '#1a1a1a';
         this.ctx.shadowBlur = 5;
         this.ctx.shadowColor = '#000';
@@ -852,20 +961,29 @@ class ChronosEngine {
         });
         this.ctx.globalAlpha = 1.0;
         this.player.draw(this.ctx);
-    }
 
-    loop() {
+        this.ctx.restore();
+    }
+    loop(timestamp) {
         if (!this.running) {
             this.loopInitiated = false; // Reset so it can be restarted
+            this.lastTime = 0;
             return;
         }
 
+        if (!timestamp) timestamp = performance.now();
+        if (!this.lastTime) this.lastTime = timestamp;
+
+        // Normalize to 60fps and cap to avoid huge jumps
+        const dt = Math.min((timestamp - this.lastTime) / (1000 / 60), 2.0);
+        this.lastTime = timestamp;
+
         if (!this.isPaused) {
-            this.update();
+            this.update(dt);
             this.draw();
         }
 
-        requestAnimationFrame(() => this.loop());
+        requestAnimationFrame((t) => this.loop(t));
     }
 }
 
