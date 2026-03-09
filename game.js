@@ -308,14 +308,17 @@ class Enemy {
             ctx.arc(this.pos.x, this.pos.y, 18, 0, Math.PI * 2);
             ctx.fill();
             if (this.chargeTimer > 0) {
+                // Optimize: disable shadows for laser preview as it's very expensive
+                ctx.shadowBlur = 0;
                 const targetDir = game.player.pos.sub(this.pos).normalize();
                 ctx.setLineDash([2, 5]);
                 ctx.strokeStyle = 'rgba(0, 255, 136, 0.4)';
                 ctx.beginPath();
                 ctx.moveTo(this.pos.x, this.pos.y);
-                ctx.lineTo(this.pos.x + targetDir.x * 2000, this.pos.y + targetDir.y * 2000);
+                ctx.lineTo(this.pos.x + targetDir.x * 1200, this.pos.y + targetDir.y * 1200);
                 ctx.stroke();
                 ctx.setLineDash([]);
+                ctx.shadowBlur = 15; // Restore for the body
             }
         }
         ctx.shadowBlur = 0;
@@ -662,7 +665,7 @@ class ChronosEngine {
                     for (let j = 1; j < 20; j++) {
                         const wx = i * 250;
                         const wy = j * 250;
-                        if (Math.random() > 0.65) { // Reduzido de 0.4 para 0.65 (menos paredes)
+                        if (Math.random() > 0.8) { // Mais aberto (reduzido de 0.65 para 0.8)
                             const isVert = Math.random() > 0.5;
                             this.walls.push({
                                 x: wx, y: wy,
@@ -703,7 +706,7 @@ class ChronosEngine {
                 });
 
                 // Scatter fewer normal snipers
-                for (let i = 0; i < 18; i++) { // Reduzido de 40 para 18
+                for (let i = 0; i < 10; i++) { // Reduzido de 18 para 10
                     const sx = Math.random() * (this.worldWidth - 600) + 300;
                     const sy = Math.random() * (this.worldHeight - 600) + 300;
                     if (new Vector(sx, sy).dist(this.player.pos) > 600) {
@@ -730,7 +733,7 @@ class ChronosEngine {
             tsHud.classList.add('hidden');
         }
 
-        this.timestopUses = 2; // Reset uses per level
+        this.timestopUses = (n === 20) ? 5 : 2; // Reset uses per level (5 on final level)
         this.timestopEnergy = 100;
         this.isTimestopped = false;
         this.updateTimeStopUI();
@@ -1173,8 +1176,19 @@ class ChronosEngine {
         this.ctx.stroke();
         this.ctx.setLineDash([]);
 
-        this.projectiles.forEach(p => p.draw(this.ctx, this.globalTimeFactor));
-        this.enemies.forEach(e => e.draw(this.ctx));
+        this.projectiles.forEach(p => {
+            if (p.pos.x > this.cameraX - 100 && p.pos.x < this.cameraX + 1700 &&
+                p.pos.y > this.cameraY - 100 && p.pos.y < this.cameraY + 1000) {
+                p.draw(this.ctx, this.globalTimeFactor);
+            }
+        });
+
+        this.enemies.forEach(e => {
+            if (e.pos.x > this.cameraX - 100 && e.pos.x < this.cameraX + 1700 &&
+                e.pos.y > this.cameraY - 100 && e.pos.y < this.cameraY + 1000) {
+                e.draw(this.ctx);
+            }
+        });
         this.keys.forEach(k => k.draw(this.ctx));
         this.particles.forEach(p => {
             this.ctx.globalAlpha = p.life;
