@@ -62,6 +62,11 @@ class Player {
         const nextPos = this.pos.add(this.vel.mult(dt));
         if (!game.checkCollision(nextPos, this.radius)) {
             this.pos = nextPos;
+        } else if (this.vel.mag() > 0) {
+            // Se houve tentativa de movimento mas falhou por colisão, logar para debug
+            if (game.level === 20) {
+                console.log("Bloqueado em:", nextPos.x, nextPos.y);
+            }
         }
 
         if (keys[' '] && this.energy >= 30 && this.dashCooldown <= 0 && !game.isTimestopped) {
@@ -668,8 +673,15 @@ class ChronosEngine {
                     }
                 }
 
-                // Clear center area around portal
-                this.walls = this.walls.filter(w => new Vector(w.x, w.y).dist(this.exit) > 400);
+                // Clear center area around portal AND player to ensure movement
+                this.walls = this.walls.filter(w => {
+                    const wallCenter = new Vector(w.x + w.w / 2, w.y + w.h / 2);
+                    return wallCenter.dist(this.player.pos) > 200 && wallCenter.dist(this.exit) > 200;
+                });
+
+                console.log("Level 20 initialized. World:", this.worldWidth, "x", this.worldHeight);
+                console.log("Player starting at:", this.player.pos.x, this.player.pos.y);
+                console.log("Walls count:", this.walls.length);
 
                 // Place 5 Keys in corners/edges
                 const keyPos = [
@@ -770,7 +782,11 @@ class ChronosEngine {
     }
 
     checkCollision(pos, radius) {
-        if (pos.x < 0 || pos.x > this.worldWidth || pos.y < 0 || pos.y > this.worldHeight) return true;
+        // Only block if it goes OUTSIDE world bounds
+        if (pos.x < 0 || pos.x > this.worldWidth || pos.y < 0 || pos.y > this.worldHeight) {
+            console.log("Colisão com limite do mundo:", pos.x, pos.y);
+            return true;
+        }
         for (let wall of this.walls) {
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
@@ -1003,6 +1019,10 @@ class ChronosEngine {
         this.cameraY = this.player.pos.y - 450; // Center (900/2)
         this.cameraX = Math.max(0, Math.min(this.cameraX, this.worldWidth - 1600));
         this.cameraY = Math.max(0, Math.min(this.cameraY, this.worldHeight - 900));
+
+        if (this.level === 20 && this.introTimer < 0.1) {
+            console.log("Camera focused at:", this.cameraX, this.cameraY);
+        }
 
         // Background Particles
         const ts = this.isTimestopped ? 0 : this.globalTimeFactor;
