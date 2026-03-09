@@ -482,6 +482,7 @@ class ChronosEngine {
     }
 
     initLevel(n) {
+        this.level = n;
         this.enemies = [];
         this.projectiles = [];
         this.walls = [];
