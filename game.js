@@ -185,8 +185,10 @@ class Projectile {
             this.active = false;
         }
 
-        // Kill bullet if it goes too far out of screenspace
-        if (this.pos.x < -1000 || this.pos.x > 5000 || this.pos.y < -1000 || this.pos.y > 5000) {
+        // Kill bullet if it goes too far out of world bounds
+        const margin = 1000;
+        if (this.pos.x < -margin || this.pos.x > game.worldWidth + margin ||
+            this.pos.y < -margin || this.pos.y > game.worldHeight + margin) {
             this.active = false;
         }
 
@@ -428,10 +430,10 @@ class ChronosEngine {
     }
 
     initBgParticles() {
-        for (let i = 0; i < 150; i++) {
+        for (let i = 0; i < 200; i++) {
             this.bgParticles.push({
-                x: Math.random() * this.width,
-                y: Math.random() * this.height,
+                x: Math.random() * this.worldWidth,
+                y: Math.random() * this.worldHeight,
                 z: Math.random() * 2 + 1,
                 size: Math.random() * 2 + 1,
                 alpha: Math.random() * 0.5 + 0.1
@@ -478,8 +480,10 @@ class ChronosEngine {
         this.keysFound = 0;
         this.keysRequired = 0;
         this.player.energy = 100; // Reset Energy
+        this.worldWidth = 1600;  // Reset default world size
+        this.worldHeight = 900;
         this.bgParticles = [];
-        this.initBgParticles();
+        this.projectiles = [];
 
         const centerX = this.width / 2;
         const centerY = this.height / 2;
@@ -689,11 +693,16 @@ class ChronosEngine {
                     }
                 }
                 break;
-            default:
-                this.worldWidth = 1600;
-                this.worldHeight = 900;
-                break;
         }
+
+        // Initialize particles AFTER worldWidth/Height are set
+        this.initBgParticles();
+
+        // Focus camera on player initially
+        this.cameraX = this.player.pos.x - 800;
+        this.cameraY = this.player.pos.y - 450;
+        this.cameraX = Math.max(0, Math.min(this.cameraX, this.worldWidth - 1600));
+        this.cameraY = Math.max(0, Math.min(this.cameraY, this.worldHeight - 900));
 
         // Show Time Stop HUD only on 16+
         const tsHud = document.getElementById('timestop-hud-container');
@@ -761,7 +770,7 @@ class ChronosEngine {
     }
 
     checkCollision(pos, radius) {
-        if (pos.x < 0 || pos.x > this.width || pos.y < 0 || pos.y > this.height) return true;
+        if (pos.x < 0 || pos.x > this.worldWidth || pos.y < 0 || pos.y > this.worldHeight) return true;
         for (let wall of this.walls) {
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
@@ -974,6 +983,11 @@ class ChronosEngine {
         if (!this.running || this.isPaused) return;
 
         if (this.isLevelIntro) {
+            // Allow skipping intro with Space, Enter or Escape
+            if (this.inputKeys[' '] || this.inputKeys['Enter'] || this.inputKeys['Escape']) {
+                this.isLevelIntro = false;
+            }
+
             this.introTimer += dt;
             if (this.introTimer > 1) {
                 this.introTextProgress += 0.5 * dt;
