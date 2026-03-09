@@ -662,7 +662,7 @@ class ChronosEngine {
                     for (let j = 1; j < 20; j++) {
                         const wx = i * 250;
                         const wy = j * 250;
-                        if (Math.random() > 0.4) {
+                        if (Math.random() > 0.65) { // Reduzido de 0.4 para 0.65 (menos paredes)
                             const isVert = Math.random() > 0.5;
                             this.walls.push({
                                 x: wx, y: wy,
@@ -702,8 +702,8 @@ class ChronosEngine {
                     this.enemies.push(new Enemy(p.x - 40, p.y - 40, 'sentinel'));
                 });
 
-                // Scatter many normal snipers
-                for (let i = 0; i < 40; i++) {
+                // Scatter fewer normal snipers
+                for (let i = 0; i < 18; i++) { // Reduzido de 40 para 18
                     const sx = Math.random() * (this.worldWidth - 600) + 300;
                     const sy = Math.random() * (this.worldHeight - 600) + 300;
                     if (new Vector(sx, sy).dist(this.player.pos) > 600) {
@@ -794,6 +794,10 @@ class ChronosEngine {
             return true;
         }
         for (let wall of this.walls) {
+            // Optimization: Skip distance walls (Broad-phase)
+            if (Math.abs(pos.x - (wall.x + wall.w / 2)) > 300 ||
+                Math.abs(pos.y - (wall.y + wall.h / 2)) > 300) continue;
+
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
                 return true;
@@ -1134,13 +1138,17 @@ class ChronosEngine {
         this.ctx.fillStyle = '#0a0a0a';
         this.ctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
 
-        // Draw Background Particles
+        // Draw Background Particles with Frustum Culling
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
         this.bgParticles.forEach(p => {
-            this.ctx.globalAlpha = p.alpha;
-            this.ctx.beginPath();
-            this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            this.ctx.fill();
+            // Only draw if inside camera view
+            if (p.x > this.cameraX - 50 && p.x < this.cameraX + 1650 &&
+                p.y > this.cameraY - 50 && p.y < this.cameraY + 950) {
+                this.ctx.globalAlpha = p.alpha;
+                this.ctx.beginPath();
+                this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
         });
         this.ctx.globalAlpha = 1.0;
 
@@ -1148,9 +1156,13 @@ class ChronosEngine {
         this.ctx.shadowBlur = 5;
         this.ctx.shadowColor = '#000';
         this.walls.forEach(w => {
-            this.ctx.fillRect(w.x, w.y, w.w, w.h);
-            this.ctx.strokeStyle = '#333';
-            this.ctx.strokeRect(w.x, w.y, w.w, w.h);
+            // Frustum Culling for walls
+            if (w.x + w.w > this.cameraX && w.x < this.cameraX + 1600 &&
+                w.y + w.h > this.cameraY && w.y < this.cameraY + 900) {
+                this.ctx.fillRect(w.x, w.y, w.w, w.h);
+                this.ctx.strokeStyle = '#333';
+                this.ctx.strokeRect(w.x, w.y, w.w, w.h);
+            }
         });
 
         this.ctx.lineWidth = 3;
