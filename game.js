@@ -649,9 +649,9 @@ class ChronosEngine {
             case 20:
                 this.worldWidth = 5000;
                 this.worldHeight = 5000;
-                this.keysRequired = 5;
+                this.keysRequired = 3;
                 this.isLevelIntro = true;
-                this.introText = "PROTOCOLO FINAL: O ARQUITETO DE CHRONOS. RECONSTRUA O NÚCLEO COLETANDO AS 5 ÂNCORAS TEMPORAIS.";
+                this.introText = "PROTOCOLO FINAL: O ARQUITETO DE CHRONOS. RECONSTRUA O NÚCLEO COLETANDO AS 3 ÂNCORAS TEMPORAIS.";
                 this.introTimer = 0;
                 this.introTextProgress = 0;
 
@@ -692,21 +692,20 @@ class ChronosEngine {
                 console.log("Player starting at:", this.player.pos.x, this.player.pos.y);
                 console.log("Walls count:", this.walls.length);
 
-                // Place 5 Keys in corners/edges
+                // Place 3 Keys in corners/edges
                 const keyPos = [
                     new Vector(400, 400), new Vector(4600, 400),
-                    new Vector(400, 4600), new Vector(4600, 4600),
-                    new Vector(1000, 2500)
+                    new Vector(2500, 4600)
                 ];
                 keyPos.forEach(p => {
                     this.keys.push(new Key(p.x, p.y));
-                    // Boss Guardian for each key
-                    this.enemies.push(new Enemy(p.x + 40, p.y + 40, 'sniper'));
+                    // Reduced Guardian difficulty: replaced sniper with drone
+                    this.enemies.push(new Enemy(p.x + 40, p.y + 40, 'drone'));
                     this.enemies.push(new Enemy(p.x - 40, p.y - 40, 'sentinel'));
                 });
 
-                // Scatter fewer normal snipers
-                for (let i = 0; i < 10; i++) { // Reduzido de 18 para 10
+                // Scatter very few normal snipers
+                for (let i = 0; i < 4; i++) { // Reduzido de 10 para 4
                     const sx = Math.random() * (this.worldWidth - 600) + 300;
                     const sy = Math.random() * (this.worldHeight - 600) + 300;
                     if (new Vector(sx, sy).dist(this.player.pos) > 600) {
