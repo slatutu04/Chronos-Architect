@@ -473,7 +473,9 @@ class ChronosEngine {
         // Draw Keys on radar
         ctx.fillStyle = '#fff100';
         this.keys.forEach(k => {
-            ctx.fillRect(k.pos.x * radarScale - 2, k.pos.y * radarScale - 2, 4, 4);
+            if (!k.collected) {
+                ctx.fillRect(k.pos.x * radarScale - 2, k.pos.y * radarScale - 2, 4, 4);
+            }
         });
 
         ctx.restore();
@@ -767,8 +769,9 @@ class ChronosEngine {
     updateTimeStopUI() {
         const fill = document.getElementById('timestop-fill');
         const usesTxt = document.getElementById('timestop-uses');
+        const total = (this.level === 20) ? 5 : 2;
         if (fill) fill.style.width = this.timestopEnergy + '%';
-        if (usesTxt) usesTxt.innerText = `Uses: ${this.timestopUses}/2`;
+        if (usesTxt) usesTxt.innerText = `Uses: ${this.timestopUses}/${total}`;
     }
 
     onKeyCollected() {
@@ -1077,6 +1080,7 @@ class ChronosEngine {
             });
             this.particles = this.particles.filter(p => p.life > 0);
             this.keys.forEach(k => k.update(dt));
+            this.keys = this.keys.filter(k => !k.collected);
 
         } else {
             // NORMAL MODES
@@ -1103,6 +1107,7 @@ class ChronosEngine {
             this.player.update(this.inputKeys, this.canvas, dt);
             this.enemies.forEach(e => e.update(scaledTime, this.player.pos));
             this.keys.forEach(k => k.update(dt));
+            this.keys = this.keys.filter(k => !k.collected);
             this.projectiles.forEach(p => p.update(scaledTime));
             this.projectiles = this.projectiles.filter(p => p.active);
 
