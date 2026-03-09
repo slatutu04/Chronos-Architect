@@ -35,10 +35,10 @@ class Player {
 
     update(keys, canvas, dt) {
         this.vel = new Vector(0, 0);
-        if (keys['w'] || keys['ArrowUp']) this.vel.y = -1;
-        if (keys['s'] || keys['ArrowDown']) this.vel.y = 1;
-        if (keys['a'] || keys['ArrowLeft']) this.vel.x = -1;
-        if (keys['d'] || keys['ArrowRight']) this.vel.x = 1;
+        if (keys['w'] || keys['W'] || keys['ArrowUp']) this.vel.y = -1;
+        if (keys['s'] || keys['S'] || keys['ArrowDown']) this.vel.y = 1;
+        if (keys['a'] || keys['A'] || keys['ArrowLeft']) this.vel.x = -1;
+        if (keys['d'] || keys['D'] || keys['ArrowRight']) this.vel.x = 1;
 
         if (this.vel.mag() > 0) {
             this.vel = this.vel.normalize().mult(this.speed);
@@ -673,10 +673,16 @@ class ChronosEngine {
                     }
                 }
 
-                // Clear center area around portal AND player to ensure movement
+                // Clear center area around portal AND player using AABB check
+                const clearRadius = 250;
                 this.walls = this.walls.filter(w => {
-                    const wallCenter = new Vector(w.x + w.w / 2, w.y + w.h / 2);
-                    return wallCenter.dist(this.player.pos) > 200 && wallCenter.dist(this.exit) > 200;
+                    // Check if wall overlaps with player spawn zone
+                    const playerOverlap = (w.x < this.player.pos.x + clearRadius && w.x + w.w > this.player.pos.x - clearRadius &&
+                        w.y < this.player.pos.y + clearRadius && w.y + w.h > this.player.pos.y - clearRadius);
+                    // Check if wall overlaps with exit portal zone
+                    const exitOverlap = (w.x < this.exit.x + clearRadius && w.x + w.w > this.exit.x - clearRadius &&
+                        w.y < this.exit.y + clearRadius && w.y + w.h > this.exit.y - clearRadius);
+                    return !playerOverlap && !exitOverlap;
                 });
 
                 console.log("Level 20 initialized. World:", this.worldWidth, "x", this.worldHeight);
@@ -1004,6 +1010,13 @@ class ChronosEngine {
                 this.isLevelIntro = false;
             }
 
+            // Se o jogador tentar se mover, desativa o intro automaticamente
+            if (this.inputKeys['w'] || this.inputKeys['a'] || this.inputKeys['s'] || this.inputKeys['d'] ||
+                this.inputKeys['W'] || this.inputKeys['A'] || this.inputKeys['S'] || this.inputKeys['D'] ||
+                this.inputKeys['ArrowUp'] || this.inputKeys['ArrowDown'] || this.inputKeys['ArrowLeft'] || this.inputKeys['ArrowRight']) {
+                this.isLevelIntro = false;
+            }
+
             this.introTimer += dt;
             if (this.introTimer > 1) {
                 this.introTextProgress += 0.5 * dt;
@@ -1011,7 +1024,7 @@ class ChronosEngine {
                     this.isLevelIntro = false;
                 }
             }
-            return;
+            // NOT returning here anymore - let the update continue below
         }
 
         // Camera Logic (Follow Player)
