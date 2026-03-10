@@ -572,7 +572,7 @@ class ChronosEngine {
                 break;
             case 11:
                 this.keysRequired = 1;
-                this.keys.push(new Key(centerX, 100));
+                this.keys.push(new Key(centerX, this.height - 100));
                 this.enemies.push(new Enemy(centerX, centerY, 'sentinel'));
                 // Removed wall around sentinel as requested
                 break;
@@ -648,6 +648,9 @@ class ChronosEngine {
                     const ang = (i / 8) * Math.PI * 2;
                     this.enemies.push(new Enemy(centerX + Math.cos(ang) * 300, centerY + Math.sin(ang) * 300, 'sniper'));
                 }
+                // Vertical walls forcing center passage
+                this.walls.push({ x: centerX - 10, y: 0, w: 20, h: centerY - 100 });
+                this.walls.push({ x: centerX - 10, y: centerY + 100, w: 20, h: this.height - (centerY + 100) });
                 break;
             case 20:
                 this.worldWidth = 5000;
@@ -800,9 +803,7 @@ class ChronosEngine {
             return true;
         }
         for (let wall of this.walls) {
-            // Optimization: Skip distance walls (Broad-phase)
-            if (Math.abs(pos.x - (wall.x + wall.w / 2)) > 300 ||
-                Math.abs(pos.y - (wall.y + wall.h / 2)) > 300) continue;
+            // Check collision with wall bounding box
 
             if (pos.x + radius > wall.x && pos.x - radius < wall.x + wall.w &&
                 pos.y + radius > wall.y && pos.y - radius < wall.y + wall.h) {
