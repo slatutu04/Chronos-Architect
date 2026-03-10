@@ -648,9 +648,9 @@ class ChronosEngine {
                     const ang = (i / 8) * Math.PI * 2;
                     this.enemies.push(new Enemy(centerX + Math.cos(ang) * 300, centerY + Math.sin(ang) * 300, 'sniper'));
                 }
-                // Vertical walls forcing center passage (from edges to near the center)
-                this.walls.push({ x: centerX - 10, y: 0, w: 20, h: centerY - 50 });
-                this.walls.push({ x: centerX - 10, y: centerY + 50, w: 20, h: this.height - (centerY + 50) });
+                // Vertical walls stopping at the top and bottom snipers (radius 300 from center, sniper radius 18)
+                this.walls.push({ x: centerX - 10, y: 0, w: 20, h: (centerY - 300) - 18 });
+                this.walls.push({ x: centerX - 10, y: (centerY + 300) + 18, w: 20, h: this.height - ((centerY + 300) + 18) });
                 break;
             case 20:
                 this.worldWidth = 5000;
